@@ -32,7 +32,7 @@ export default function Collectors() {
         throw collectorsError;
       }
 
-      // Then, get all members
+      // Then, get all members with their collector names
       const { data: membersData, error: membersError } = await supabase
         .from('members')
         .select('*')
@@ -50,7 +50,11 @@ export default function Collectors() {
       const enhancedCollectorsData = collectorsData.map(collector => {
         // Normalize collector names for comparison
         const normalizeCollectorName = (name: string) => {
-          return name?.trim().toLowerCase().replace(/\s+/g, ' ') || '';
+          return name?.trim().toLowerCase()
+            .replace(/\s*[\/&]\s*/g, '') // Remove slashes and ampersands with surrounding spaces
+            .replace(/\s+/g, '')         // Remove all remaining spaces
+            .replace(/[^a-z0-9]/g, '')   // Remove any other special characters
+            || '';
         };
 
         const collectorName = normalizeCollectorName(collector.name);
@@ -63,6 +67,7 @@ export default function Collectors() {
 
         console.log(`Members for collector ${collector.name}:`, {
           collectorName,
+          normalizedName: collectorName,
           memberCount: collectorMembers.length,
           members: collectorMembers
         });
