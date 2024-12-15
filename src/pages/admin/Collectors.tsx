@@ -43,45 +43,30 @@ export default function Collectors() {
         throw membersError;
       }
 
-      console.log('Raw collectors data:', collectorsData);
-      console.log('Raw members data:', membersData);
-
-      // Map members to their collectors using the collector field
+      // Map members to their collectors using exact collector name matching
       const enhancedCollectorsData = collectorsData.map(collector => {
-        // Function to normalize collector names for comparison
-        const normalizeCollectorName = (name: string) => {
-          if (!name) return '';
-          return name.toLowerCase()
-            .replace(/[\/&,.-]/g, ' ')  // Replace special characters with spaces
-            .split(/\s+/)               // Split on whitespace
-            .filter(part => part)       // Remove empty parts
-            .sort()                     // Sort parts alphabetically
-            .join('')                   // Join back together
-            .trim();                    // Remove any trailing whitespace
-        };
-
-        // Get the normalized versions of the collector name
-        const collectorNameNormalized = normalizeCollectorName(collector.name);
-        const collectorNameParts = collector.name.toLowerCase().split(/[\/&,.-]\s*/);
-
-        // Find all members that belong to this collector
+        // Find all members that belong to this collector using exact name matching
         const collectorMembers = membersData?.filter(member => {
-          if (!member.collector) return false;
-          
-          const memberCollectorNormalized = normalizeCollectorName(member.collector);
-          
-          // Check if the normalized names match
-          if (memberCollectorNormalized === collectorNameNormalized) return true;
-          
-          // Check if any part of the collector name matches
-          return collectorNameParts.some(part => 
-            memberCollectorNormalized.includes(part.trim())
-          );
+          // Normalize both names for comparison by removing extra spaces and making case insensitive
+          const normalizeForComparison = (name: string) => {
+            return name?.trim().toLowerCase().replace(/\s+/g, ' ') || '';
+          };
+
+          const memberCollectorName = normalizeForComparison(member.collector);
+          const collectorName = normalizeForComparison(collector.name);
+
+          // Log the comparison for debugging
+          console.log(`Comparing member collector "${member.collector}" with collector "${collector.name}":`, {
+            memberNormalized: memberCollectorName,
+            collectorNormalized: collectorName,
+            matches: memberCollectorName === collectorName
+          });
+
+          return memberCollectorName === collectorName;
         }) || [];
 
         console.log(`Members for collector ${collector.name}:`, {
           collectorName: collector.name,
-          normalizedName: collectorNameNormalized,
           memberCount: collectorMembers.length,
           members: collectorMembers.map(m => ({
             id: m.id,
