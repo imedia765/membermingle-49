@@ -48,28 +48,46 @@ export default function Collectors() {
 
       // Map members to their collectors using the collector field
       const enhancedCollectorsData = collectorsData.map(collector => {
-        // Normalize collector names for comparison
+        // Function to normalize collector names for comparison
         const normalizeCollectorName = (name: string) => {
-          return name?.trim().toLowerCase()
-            .replace(/\s*[\/&]\s*/g, '') // Remove slashes and ampersands with surrounding spaces
-            .replace(/\s+/g, '')         // Remove all remaining spaces
-            .replace(/[^a-z0-9]/g, '')   // Remove any other special characters
-            || '';
+          if (!name) return '';
+          return name.toLowerCase()
+            .replace(/[\/&,.-]/g, ' ')  // Replace special characters with spaces
+            .split(/\s+/)               // Split on whitespace
+            .filter(part => part)       // Remove empty parts
+            .sort()                     // Sort parts alphabetically
+            .join('')                   // Join back together
+            .trim();                    // Remove any trailing whitespace
         };
 
-        const collectorName = normalizeCollectorName(collector.name);
-        
-        // Find all members that belong to this collector using the collector field
+        // Get the normalized versions of the collector name
+        const collectorNameNormalized = normalizeCollectorName(collector.name);
+        const collectorNameParts = collector.name.toLowerCase().split(/[\/&,.-]\s*/);
+
+        // Find all members that belong to this collector
         const collectorMembers = membersData?.filter(member => {
-          const memberCollector = normalizeCollectorName(member.collector);
-          return memberCollector === collectorName;
+          if (!member.collector) return false;
+          
+          const memberCollectorNormalized = normalizeCollectorName(member.collector);
+          
+          // Check if the normalized names match
+          if (memberCollectorNormalized === collectorNameNormalized) return true;
+          
+          // Check if any part of the collector name matches
+          return collectorNameParts.some(part => 
+            memberCollectorNormalized.includes(part.trim())
+          );
         }) || [];
 
         console.log(`Members for collector ${collector.name}:`, {
-          collectorName,
-          normalizedName: collectorName,
+          collectorName: collector.name,
+          normalizedName: collectorNameNormalized,
           memberCount: collectorMembers.length,
-          members: collectorMembers
+          members: collectorMembers.map(m => ({
+            id: m.id,
+            name: m.full_name,
+            collector: m.collector
+          }))
         });
 
         return {
