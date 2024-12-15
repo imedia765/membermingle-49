@@ -43,30 +43,53 @@ export default function Collectors() {
         throw membersError;
       }
 
+      // Debug: Log all unique collector names from members table
+      const uniqueCollectorNames = [...new Set(membersData.map(m => m.collector).filter(Boolean))];
+      console.log('Unique collector names in members table:', uniqueCollectorNames);
+
+      // Debug: Log all collector names from collectors table
+      console.log('Collectors in collectors table:', collectorsData.map(c => c.name));
+
       // Map members to their collectors using exact collector name matching
       const enhancedCollectorsData = collectorsData.map(collector => {
-        // Find all members that belong to this collector using exact name matching
+        // Function to normalize collector names for comparison
+        const normalizeCollectorName = (name: string) => {
+          if (!name) return '';
+          return name.toLowerCase()
+            .replace(/[\/&,.-]/g, ' ')  // Replace special characters with spaces
+            .split(/\s+/)               // Split on whitespace
+            .filter(part => part)       // Remove empty parts
+            .join(' ')                  // Join back together with spaces
+            .trim();                    // Remove any trailing whitespace
+        };
+
+        const normalizedCollectorName = normalizeCollectorName(collector.name);
+        
+        // Find all members that belong to this collector
         const collectorMembers = membersData?.filter(member => {
-          // Normalize both names for comparison by removing extra spaces and making case insensitive
-          const normalizeForComparison = (name: string) => {
-            return name?.trim().toLowerCase().replace(/\s+/g, ' ') || '';
-          };
-
-          const memberCollectorName = normalizeForComparison(member.collector);
-          const collectorName = normalizeForComparison(collector.name);
-
-          // Log the comparison for debugging
-          console.log(`Comparing member collector "${member.collector}" with collector "${collector.name}":`, {
-            memberNormalized: memberCollectorName,
-            collectorNormalized: collectorName,
-            matches: memberCollectorName === collectorName
-          });
-
-          return memberCollectorName === collectorName;
+          if (!member.collector) return false;
+          
+          const normalizedMemberCollector = normalizeCollectorName(member.collector);
+          
+          const isMatch = normalizedMemberCollector === normalizedCollectorName;
+          
+          // Debug: Log each comparison
+          if (isMatch) {
+            console.log('Match found:', {
+              originalCollectorName: collector.name,
+              originalMemberCollector: member.collector,
+              normalizedCollectorName,
+              normalizedMemberCollector,
+              memberName: member.full_name
+            });
+          }
+          
+          return isMatch;
         }) || [];
 
-        console.log(`Members for collector ${collector.name}:`, {
-          collectorName: collector.name,
+        // Debug: Log collector details
+        console.log(`Collector "${collector.name}":`, {
+          normalizedName: normalizedCollectorName,
           memberCount: collectorMembers.length,
           members: collectorMembers.map(m => ({
             id: m.id,
@@ -81,7 +104,6 @@ export default function Collectors() {
         };
       });
 
-      console.log('Enhanced collectors data:', enhancedCollectorsData);
       return enhancedCollectorsData;
     }
   });
