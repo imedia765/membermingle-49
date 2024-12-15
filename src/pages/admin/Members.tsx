@@ -17,15 +17,18 @@ export default function Members() {
     queryKey: ['members'],
     queryFn: async () => {
       console.log('Fetching members...');
-      const { data, error } = await supabase
+      const { data, error, count } = await supabase
         .from('members')
-        .select('*')
-        .order('created_at', { ascending: false });
+        .select('*', { count: 'exact' });
       
       if (error) {
         console.error('Error fetching members:', error);
         throw error;
       }
+      
+      // Log the actual count from the database
+      console.log('Total members count:', count);
+      console.log('Members data length:', data?.length);
       
       // Map the full_name to name for CoveredMembersOverview compatibility
       const mappedData = data.map(member => ({
@@ -33,7 +36,6 @@ export default function Members() {
         name: member.full_name
       }));
       
-      console.log('Fetched members:', mappedData);
       return mappedData;
     }
   });
@@ -52,7 +54,14 @@ export default function Members() {
       <MembersHeader />
       <MembersSearch searchTerm={searchTerm} setSearchTerm={setSearchTerm} />
       
-      {members && <CoveredMembersOverview members={members} />}
+      {members && (
+        <>
+          <div className="text-sm text-muted-foreground mb-2">
+            Total Members: {members.length}
+          </div>
+          <CoveredMembersOverview members={members} />
+        </>
+      )}
 
       <ScrollArea className="h-[calc(100vh-220px)]">
         <div className="space-y-4">
