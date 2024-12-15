@@ -7,15 +7,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-
-interface Member {
-  id: number;
-  name: string;
-  coveredMembers?: {
-    spouses?: Array<{ name: string; dateOfBirth: string }>;
-    dependants?: Array<{ name: string; dateOfBirth: string; relationship: string }>;
-  };
-}
+import { Member } from "./types";
 
 interface CoveredMembersOverviewProps {
   members: Member[];
@@ -64,7 +56,7 @@ export const CoveredMembersOverview = ({ members }: CoveredMembersOverviewProps)
                     <>
                       {member.coveredMembers?.spouses?.map((spouse, index) => (
                         <TableRow key={`spouse-${member.id}-${index}`}>
-                          <TableCell>{member.name}</TableCell>
+                          <TableCell>{member.full_name}</TableCell>
                           <TableCell>Spouse</TableCell>
                           <TableCell>{spouse.name}</TableCell>
                           <TableCell>{spouse.dateOfBirth}</TableCell>
@@ -73,7 +65,7 @@ export const CoveredMembersOverview = ({ members }: CoveredMembersOverviewProps)
                       ))}
                       {member.coveredMembers?.dependants?.map((dependant, index) => (
                         <TableRow key={`dependant-${member.id}-${index}`}>
-                          <TableCell>{member.name}</TableCell>
+                          <TableCell>{member.full_name}</TableCell>
                           <TableCell>Dependant</TableCell>
                           <TableCell>{dependant.name}</TableCell>
                           <TableCell>{dependant.dateOfBirth}</TableCell>

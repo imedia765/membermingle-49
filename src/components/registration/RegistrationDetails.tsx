@@ -18,7 +18,7 @@ export const RegistrationDetails = ({ registration }: RegistrationDetailsProps) 
             {Object.entries(personalInfo).map(([key, value]) => (
               <div key={key} className="space-y-1">
                 <p className="text-sm font-medium capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}</p>
-                <p className="text-sm text-muted-foreground">{value}</p>
+                <p className="text-sm text-muted-foreground">{String(value)}</p>
               </div>
             ))}
           </div>
@@ -30,7 +30,7 @@ export const RegistrationDetails = ({ registration }: RegistrationDetailsProps) 
             {Object.entries(nextOfKin).map(([key, value]) => (
               <div key={key} className="space-y-1">
                 <p className="text-sm font-medium capitalize">{key}</p>
-                <p className="text-sm text-muted-foreground">{value}</p>
+                <p className="text-sm text-muted-foreground">{String(value)}</p>
               </div>
             ))}
           </div>

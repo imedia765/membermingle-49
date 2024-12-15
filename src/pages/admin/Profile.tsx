@@ -1,191 +1,133 @@
-import { Receipt, Ticket, HeadsetIcon, File, MailIcon, PhoneCall } from "lucide-react";
-import { useToast } from "@/components/ui/use-toast";
+import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { AccountSettingsSection } from "@/components/profile/AccountSettingsSection";
-import { Button } from "@/components/ui/button";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { DocumentsSection } from "@/components/profile/DocumentsSection";
+import { PaymentHistorySection } from "@/components/profile/PaymentHistorySection";
+import { SupportSection } from "@/components/profile/SupportSection";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/components/ui/use-toast";
+import { useNavigate } from "react-router-dom";
 
 export default function Profile() {
+  const [searchDate, setSearchDate] = useState("");
+  const [searchAmount, setSearchAmount] = useState("");
   const { toast } = useToast();
+  const navigate = useNavigate();
+  const [userEmail, setUserEmail] = useState<string | null>(null);
 
-  const paymentHistory = [
-    { date: '2024-03-15', amount: '£50.00', status: 'Paid', type: 'Membership Fee' },
-    { date: '2024-02-15', amount: '£50.00', status: 'Paid', type: 'Membership Fee' },
+  // Check authentication and get user email
+  useEffect(() => {
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        navigate("/login");
+        return;
+      }
+      setUserEmail(session.user.email);
+    };
+
+    checkAuth();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!session) {
+        navigate("/login");
+      } else {
+        setUserEmail(session.user.email);
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [navigate]);
+
+  // Fetch member profile data
+  const { data: memberData, isLoading: memberLoading } = useQuery({
+    queryKey: ['member-profile', userEmail],
+    enabled: !!userEmail,
+    queryFn: async () => {
+      console.log('Fetching profile for email:', userEmail);
+      
+      const { data, error } = await supabase
+        .from('members')
+        .select('*, family_members(*)')
+        .eq('email', userEmail)
+        .maybeSingle();
+
+      if (error) {
+        console.error('Error fetching profile:', error);
+        toast({
+          title: "Error fetching profile",
+          description: error.message,
+          variant: "destructive",
+        });
+        return null;
+      }
+
+      if (!data) {
+        console.log('No profile found for email:', userEmail);
+        toast({
+          title: "Profile not found",
+          description: "No member profile found for this email address.",
+          variant: "destructive",
+        });
+        return null;
+      }
+
+      console.log('Found profile:', data);
+      return data;
+    },
+  });
+
+  // Mock document types (this could be moved to a constants file)
+  const documentTypes = [
+    { type: 'Identification', description: 'Valid ID document (Passport, Driving License)' },
+    { type: 'Address Proof', description: 'Recent utility bill or bank statement' },
+    { type: 'Medical Certificate', description: 'Recent medical certificate if applicable' },
+    { type: 'Marriage Certificate', description: 'Marriage certificate if applicable' },
   ];
 
-  const tickets = [
-    { id: '#1234', date: '2024-03-10', subject: 'Account Access', status: 'Open' },
-    { id: '#1233', date: '2024-02-28', subject: 'Payment Issue', status: 'Closed' },
-  ];
-
+  // Mock documents (you might want to add a documents table to Supabase later)
   const documents = [
     { name: 'ID Document.pdf', uploadDate: '2024-03-01', type: 'Identification' },
     { name: 'Proof of Address.pdf', uploadDate: '2024-02-15', type: 'Address Proof' },
   ];
 
+  if (memberLoading) {
+    return (
+      <div className="space-y-6 max-w-5xl mx-auto p-6">
+        <Skeleton className="h-8 w-64" />
+        <div className="space-y-6">
+          <Skeleton className="h-96" />
+          <Skeleton className="h-64" />
+          <Skeleton className="h-64" />
+          <Skeleton className="h-64" />
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-6 max-w-5xl mx-auto">
+    <div className="space-y-6 max-w-5xl mx-auto p-6">
       <h1 className="text-4xl font-bold bg-gradient-to-r from-primary via-primary/80 to-primary/60 bg-clip-text text-transparent">
-        Profile Settings
+        Member Profile
       </h1>
 
       <div className="space-y-6">
-        <AccountSettingsSection />
-
-        {/* Payment History Section */}
-        <Collapsible>
-          <CollapsibleTrigger asChild>
-            <Button 
-              variant="default"
-              className="flex items-center gap-2 w-full justify-between bg-primary hover:bg-primary/90"
-            >
-              <div className="flex items-center gap-2">
-                <Receipt className="h-4 w-4" />
-                <span>Payment History</span>
-              </div>
-            </Button>
-          </CollapsibleTrigger>
-          <CollapsibleContent className="pt-4">
-            <ScrollArea className="h-[300px]">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Amount</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {paymentHistory.map((payment, index) => (
-                    <TableRow key={index}>
-                      <TableCell>{payment.date}</TableCell>
-                      <TableCell>{payment.type}</TableCell>
-                      <TableCell>{payment.amount}</TableCell>
-                      <TableCell>{payment.status}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </ScrollArea>
-          </CollapsibleContent>
-        </Collapsible>
-
-        {/* Support Tickets Section */}
-        <Collapsible>
-          <CollapsibleTrigger asChild>
-            <Button 
-              variant="default"
-              className="flex items-center gap-2 w-full justify-between bg-primary hover:bg-primary/90"
-            >
-              <div className="flex items-center gap-2">
-                <Ticket className="h-4 w-4" />
-                <span>Support Tickets</span>
-              </div>
-            </Button>
-          </CollapsibleTrigger>
-          <CollapsibleContent className="pt-4">
-            <ScrollArea className="h-[300px]">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Ticket ID</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Subject</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {tickets.map((ticket, index) => (
-                    <TableRow key={index}>
-                      <TableCell>{ticket.id}</TableCell>
-                      <TableCell>{ticket.date}</TableCell>
-                      <TableCell>{ticket.subject}</TableCell>
-                      <TableCell>{ticket.status}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </ScrollArea>
-          </CollapsibleContent>
-        </Collapsible>
-
-        {/* Support Section */}
-        <Collapsible>
-          <CollapsibleTrigger asChild>
-            <Button 
-              variant="default"
-              className="flex items-center gap-2 w-full justify-between bg-primary hover:bg-primary/90"
-            >
-              <div className="flex items-center gap-2">
-                <HeadsetIcon className="h-4 w-4" />
-                <span>Support</span>
-              </div>
-            </Button>
-          </CollapsibleTrigger>
-          <CollapsibleContent className="pt-4">
-            <div className="space-y-4 p-4">
-              <p className="text-sm text-muted-foreground">
-                Need help? Contact our support team through any of these channels:
-              </p>
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <MailIcon className="h-4 w-4" />
-                  <span>support@example.com</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <PhoneCall className="h-4 w-4" />
-                  <span>+44 (0) 123 456 7890</span>
-                </div>
-              </div>
-            </div>
-          </CollapsibleContent>
-        </Collapsible>
-
-        {/* Documents Section */}
-        <Collapsible>
-          <CollapsibleTrigger asChild>
-            <Button 
-              variant="default"
-              className="flex items-center gap-2 w-full justify-between bg-primary hover:bg-primary/90"
-            >
-              <div className="flex items-center gap-2">
-                <File className="h-4 w-4" />
-                <span>Uploaded Documents</span>
-              </div>
-            </Button>
-          </CollapsibleTrigger>
-          <CollapsibleContent className="pt-4">
-            <ScrollArea className="h-[300px]">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Document Name</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Upload Date</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {documents.map((doc, index) => (
-                    <TableRow key={index}>
-                      <TableCell>{doc.name}</TableCell>
-                      <TableCell>{doc.type}</TableCell>
-                      <TableCell>{doc.uploadDate}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </ScrollArea>
-          </CollapsibleContent>
-        </Collapsible>
+        <AccountSettingsSection memberData={memberData} />
+        <DocumentsSection 
+          documents={documents}
+          documentTypes={documentTypes}
+        />
+        <PaymentHistorySection 
+          memberId={memberData?.id || ''}
+          searchDate={searchDate}
+          searchAmount={searchAmount}
+          onSearchDateChange={setSearchDate}
+          onSearchAmountChange={setSearchAmount}
+        />
+        <SupportSection />
       </div>
     </div>
   );

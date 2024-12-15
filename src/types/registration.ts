@@ -1,15 +1,21 @@
 export interface Registration {
-  id: number;
+  id: string;
   name: string;
-  age: number;
-  area: string;
   status: string;
   date: string;
   email: string;
   contact: string;
   address: string;
   personalInfo?: {
-    [key: string]: string;
+    fullName: string;
+    address: string;
+    town: string;
+    postCode: string;
+    email: string;
+    mobile: string;
+    dateOfBirth: string;
+    gender: string;
+    maritalStatus: string;
   };
   nextOfKin?: {
     [key: string]: string;

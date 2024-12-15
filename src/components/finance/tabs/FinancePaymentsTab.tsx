@@ -35,7 +35,7 @@ export function FinancePaymentsTab() {
               Export
             </Button>
           </div>
-          <TransactionsTable transactions={[]} />
+          <TransactionsTable />
         </div>
       </CardContent>
     </Card>

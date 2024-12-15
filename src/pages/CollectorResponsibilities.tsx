@@ -1,8 +1,20 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Link } from "react-router-dom";
+import { ChevronLeft } from "lucide-react";
 
 const CollectorResponsibilities = () => {
   return (
     <div className="container py-8 space-y-8 max-w-4xl mx-auto">
+      <div className="flex items-center">
+        <Link to="/">
+          <Button variant="ghost" className="flex items-center gap-2">
+            <ChevronLeft className="h-4 w-4" />
+            Back to Home
+          </Button>
+        </Link>
+      </div>
+
       <h1 className="text-4xl font-bold text-center bg-gradient-to-r from-primary via-primary/80 to-primary/60 bg-clip-text text-transparent mb-8 animate-fade-in">
         PWA Collector Member Responsibilities
       </h1>

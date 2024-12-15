@@ -19,6 +19,7 @@ import Collectors from "./pages/admin/Collectors";
 import Registrations from "./pages/admin/Registrations";
 import Database from "./pages/admin/Database";
 import Finance from "./pages/admin/Finance";
+import Support from "./pages/admin/Support";
 import Profile from "./pages/admin/Profile";
 
 const queryClient = new QueryClient();
@@ -47,6 +48,7 @@ const App = () => (
                   <Route path="registrations" element={<Registrations />} />
                   <Route path="database" element={<Database />} />
                   <Route path="finance" element={<Finance />} />
+                  <Route path="support" element={<Support />} />
                   <Route path="profile" element={<Profile />} />
                 </Route>
               </Routes>

@@ -1,26 +1,148 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import React from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card/card';
 import { Users, UserCheck, ClipboardList, DollarSign, TrendingUp, ArrowUpRight, ArrowDownRight, Activity } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { Button } from "@/components/ui/button";
+import { useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { PostgrestQueryBuilder } from "@supabase/postgrest-js";
 
-const membershipData = [
-  { month: 'Jan', members: 220, revenue: 4400 },
-  { month: 'Feb', members: 230, revenue: 4600 },
-  { month: 'Mar', members: 235, revenue: 4700 },
-  { month: 'Apr', members: 240, revenue: 4800 },
-  { month: 'May', members: 245, revenue: 4900 },
-];
+// Define a type for the 'registrations' table
+type RegistrationsTable = {
+  Row: {
+    id: string;
+    status: string;
+    created_at: string;
+  };
+};
 
-const membershipTypeData = [
-  { name: 'Individual', value: 150 },
-  { name: 'Family', value: 80 },
-  { name: 'Senior', value: 45 },
-  { name: 'Student', value: 20 },
-];
+// Define a type for the 'members' table
+type MembersTable = {
+    Row: {
+        id: string;
+        membership_type: string;
+        created_at: string;
+    };
+};
 
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042'];
 
 export default function Dashboard() {
+  const [totalMembers, setTotalMembers] = useState(0);
+  const [activeCollectors, setActiveCollectors] = useState(0);
+  const [pendingRegistrations, setPendingRegistrations] = useState(0);
+  const [monthlyRevenue, setMonthlyRevenue] = useState(0);
+  const [membershipTypeData, setMembershipTypeData] = useState([]);
+  const [membershipData, setMembershipData] = useState([]);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        // Fetch total members using count
+        const { count: membersCount, error: membersError } = await supabase
+          .from("members")
+          .select('*', { count: 'exact', head: true });
+        
+        if (membersError) throw membersError;
+        setTotalMembers(membersCount || 0);
+
+        // Fetch active collectors
+        const { data: collectorsData, error: collectorsError } = await supabase
+          .from("collectors")
+          .select("*", { count: 'exact' })
+          .eq('active', true);
+        if (collectorsError) throw collectorsError;
+        setActiveCollectors(collectorsData.length);
+
+        // Fetch pending registrations
+          const { data: registrationsData, error: registrationsError } = await (supabase
+              .from("registrations") as PostgrestQueryBuilder<any, RegistrationsTable>)
+              .select("*", { count: 'exact' })
+              .eq('status', 'pending');
+          if (registrationsError) throw registrationsError;
+          setPendingRegistrations(registrationsData.length);
+
+
+          // Fetch monthly revenue (This is a simplified example, you might need a more complex query or a database function)
+          const { data: paymentsData, error: paymentsError } = await supabase
+              .from('payments')
+              .select('amount')
+              .gte('created_at', new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString());
+
+          if (paymentsError) throw paymentsError;
+
+          const totalRevenue = paymentsData.reduce((sum, payment) => sum + payment.amount, 0);
+          setMonthlyRevenue(totalRevenue);
+
+
+          // Fetch membership type distribution
+          const { data: membershipTypes, error: membershipTypesError } = await supabase
+              .from('members')
+              .select('membership_type') as {data: MembersTable['Row'][], error: any};
+
+          if (membershipTypesError) throw membershipTypesError;
+
+          const typeCounts = membershipTypes.reduce((acc, curr) => {
+              acc[curr.membership_type] = (acc[curr.membership_type] || 0) + 1;
+              return acc;
+          }, {});
+
+          const formattedMembershipTypeData = Object.entries(typeCounts).map(([name, value]) => ({
+              name,
+              value: value as number,
+          }));
+          setMembershipTypeData(formattedMembershipTypeData);
+
+
+          // Fetch membership data for chart (This is a simplified example, you might need a more complex query or a database function)
+          const currentDate = new Date();
+          const currentYear = currentDate.getFullYear();
+          const currentMonth = currentDate.getMonth();
+
+          const monthlyData = [];
+          for (let i = 0; i < 5; i++) {
+              const month = new Date(currentYear, currentMonth - i);
+              const monthName = month.toLocaleString('default', { month: 'short' });
+              const firstDayOfMonth = new Date(month.getFullYear(), month.getMonth(), 1).toISOString();
+              const lastDayOfMonth = new Date(month.getFullYear(), month.getMonth() + 1, 0).toISOString();
+
+              const { data: monthlyMembers, error: monthlyMembersError } = await supabase
+                  .from('members')
+                  .select('*', { count: 'exact' })
+                  .gte('created_at', firstDayOfMonth)
+                  .lt('created_at', lastDayOfMonth);
+
+              if (monthlyMembersError) throw monthlyMembersError;
+
+              const { data: monthlyPayments, error: monthlyPaymentsError } = await supabase
+                  .from('payments')
+                  .select('amount')
+                  .gte('created_at', firstDayOfMonth)
+                  .lt('created_at', lastDayOfMonth);
+
+              if (monthlyPaymentsError) throw monthlyPaymentsError;
+
+              const monthlyRevenue = monthlyPayments.reduce((sum, payment) => sum + payment.amount, 0);
+
+              monthlyData.push({
+                  month: monthName,
+                  members: monthlyMembers.length,
+                  revenue: monthlyRevenue,
+              });
+          }
+          setMembershipData(monthlyData.reverse());
+
+
+      } catch (error) {
+        console.error("Error fetching data:", error);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042'];
+
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col space-y-4">
@@ -43,26 +165,26 @@ export default function Dashboard() {
         <StatsCard 
           icon={<Users className="h-6 w-6" />} 
           title="Total Members" 
-          value="245" 
-          trend={{ value: "+10%", positive: true }}
+          value={totalMembers.toString()}
+          trend={{ value: "+10%", positive: true }} // Placeholder, needs actual trend calculation
         />
         <StatsCard 
           icon={<UserCheck className="h-6 w-6" />} 
           title="Active Collectors" 
-          value="12" 
-          trend={{ value: "0%", positive: true }}
+          value={activeCollectors.toString()}
+          trend={{ value: "0%", positive: true }} // Placeholder, needs actual trend calculation
         />
         <StatsCard 
           icon={<ClipboardList className="h-6 w-6" />} 
           title="Pending Registrations" 
-          value="8" 
-          trend={{ value: "-25%", positive: false }}
+          value={pendingRegistrations.toString()}
+          trend={{ value: "-25%", positive: false }} // Placeholder, needs actual trend calculation
         />
         <StatsCard 
           icon={<DollarSign className="h-6 w-6" />} 
           title="Monthly Revenue" 
-          value="£4,900" 
-          trend={{ value: "+12%", positive: true }}
+          value={`£${monthlyRevenue.toFixed(2)}`}
+          trend={{ value: "+12%", positive: true }} // Placeholder, needs actual trend calculation
         />
       </div>
 

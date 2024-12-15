@@ -44,7 +44,7 @@ const Index = () => {
           <InfoCard title="Important Information">
             <div className="space-y-3 sm:space-y-4 text-muted-foreground text-sm sm:text-base">
               <p className="leading-relaxed">Trialled so far online payment using Stripe - not enough uptake, sidelined for possible future use.</p>
-              <p className="font-medium text-destructive leading-relaxed">Check with your collector if payments up to date, if not up to date YOU ARE NOT COVERED! The responsibility to pay is on the member, not the Collector.</p>
+              <p className="font-medium text-yellow-300 leading-relaxed">Check with your collector if payments up to date, if not up to date YOU ARE NOT COVERED! The responsibility to pay is on the member, not the Collector.</p>
               <p className="leading-relaxed">
                 Unfortunately we are not taking on new members. So if Collectors are in arrears, they will be given deadlines to clear arrears. After this deadline you will no longer be considered to be a member of Pakistan Welfare Committee, and currently we are not taking any more members on so you will be advised to join another Committee if they are willing to take new members.
               </p>

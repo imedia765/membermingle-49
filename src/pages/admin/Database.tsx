@@ -1,111 +1,113 @@
+import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Download, Upload, RefreshCw, FileJson } from "lucide-react";
-import { transformMemberData } from "@/utils/dataTransform";
+import { Download, Upload, RefreshCw, Merge } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { ImportSection } from "@/components/database/ImportSection";
+import { exportDatabase, restoreDatabase } from "@/utils/databaseBackup";
+import { findDuplicateCollectors, mergeCollectors } from "@/utils/collectorCleanup";
 
 export default function Database() {
   const { toast } = useToast();
+  const navigate = useNavigate();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isCleaningUp, setIsCleaningUp] = useState(false);
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  useEffect(() => {
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast({
+          title: "Authentication required",
+          description: "Please login to access this page",
+          variant: "destructive",
+        });
+        navigate("/login");
+      }
+    };
+
+    checkAuth();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "SIGNED_OUT" || !session) {
+        navigate("/login");
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [navigate, toast]);
+
+  const handleBackup = async () => {
+    try {
+      await exportDatabase();
+      toast({
+        title: "Backup successful",
+        description: "Database backup has been downloaded",
+      });
+    } catch (error) {
+      toast({
+        title: "Backup failed",
+        description: error instanceof Error ? error.message : "An error occurred during backup",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleRestore = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
     try {
-      const text = await file.text();
+      await restoreDatabase(file);
+      toast({
+        title: "Restore successful",
+        description: "Database has been restored from backup",
+      });
+    } catch (error) {
+      toast({
+        title: "Restore failed",
+        description: error instanceof Error ? error.message : "An error occurred during restore",
+        variant: "destructive",
+      });
+    } finally {
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleCleanupDuplicates = async () => {
+    try {
+      setIsCleaningUp(true);
+      const duplicates = await findDuplicateCollectors();
       
-      // More aggressive JSON string cleaning
-      let cleanedText = text
-        // Remove comments
-        .replace(/\/\*[\s\S]*?\*\/|([^\\:]|^)\/\/.*$/gm, '')
-        // Remove trailing commas
-        .replace(/,(\s*[}\]])/g, '$1')
-        // Quote all unquoted keys (more comprehensive)
-        .replace(/({|,)\s*([a-zA-Z_$][a-zA-Z0-9_$]*)\s*:/g, '$1"$2":')
-        // Convert single quotes to double quotes
-        .replace(/'([^']*)'/g, '"$1"')
-        // Remove whitespace between values
-        .replace(/\s+/g, ' ')
-        // Remove empty lines and trim
-        .trim();
-
-      // Additional cleanup for common JSON issues
-      cleanedText = cleanedText
-        // Fix multiple consecutive commas
-        .replace(/,\s*,/g, ',')
-        // Remove commas before closing brackets
-        .replace(/,\s*([\]}])/g, '$1')
-        // Ensure proper array/object closure
-        .replace(/([{\[])\s*,/g, '$1');
-
-      let jsonData;
-      try {
-        jsonData = JSON.parse(cleanedText);
-      } catch (parseError) {
-        console.error('JSON Parse Error:', parseError);
-        
-        // Enhanced error context
-        const errorMessage = (parseError as SyntaxError).message;
-        const positionMatch = errorMessage.match(/position (\d+)/);
-        let errorContext = '';
-        
-        if (positionMatch) {
-          const position = parseInt(positionMatch[1]);
-          const start = Math.max(0, position - 50);
-          const end = Math.min(cleanedText.length, position + 50);
-          
-          errorContext = cleanedText.slice(start, end)
-            .split('\n')
-            .map((line, i) => {
-              if (line.length > 100) {
-                return line.slice(0, 50) + '...' + line.slice(-50);
-              }
-              return line;
-            })
-            .join('\n');
-            
-          errorContext = `\n...${errorContext}...\n[Error near position ${position}]`;
-        }
-
+      if (duplicates.length === 0) {
         toast({
-          title: "Invalid JSON Format",
-          description: `Please check your JSON formatting. ${errorMessage}${errorContext}\n\nCommon issues include:\n- Missing quotes around property names\n- Trailing commas\n- Unmatched brackets\n- Invalid values`,
-          variant: "destructive",
+          title: "No duplicates found",
+          description: "Your database is clean - no duplicate collectors found.",
         });
         return;
       }
 
-      // Ensure the data is an array
-      if (!Array.isArray(jsonData)) {
-        jsonData = [jsonData];
-      }
-
-      const transformedData = transformMemberData(jsonData);
-
-      // Create a blob with the transformed data
-      const blob = new Blob([JSON.stringify(transformedData, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
+      await mergeCollectors(duplicates);
       
-      // Create a link and trigger download
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = 'transformed-members.json';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-
       toast({
-        title: "Data transformed successfully",
-        description: "Your data has been processed and downloaded with new member numbers.",
+        title: "Cleanup successful",
+        description: `Merged ${duplicates.length} groups of duplicate collectors.`,
       });
     } catch (error) {
-      console.error('Error processing file:', error);
+      console.error('Cleanup error:', error);
       toast({
-        title: "Error processing file",
-        description: "An error occurred while processing your file. Please check the console for details.",
+        title: "Cleanup failed",
+        description: error instanceof Error ? error.message : "An error occurred during cleanup",
         variant: "destructive",
       });
+    } finally {
+      setIsCleaningUp(false);
     }
   };
 
@@ -116,34 +118,7 @@ export default function Database() {
       </h1>
 
       <div className="grid gap-4 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Transform Member Data</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Upload your JSON file to transform member data and generate new member numbers.
-              The processed file will be automatically downloaded.
-            </p>
-            <div className="flex items-center gap-4">
-              <input
-                type="file"
-                accept=".json"
-                onChange={handleFileUpload}
-                className="hidden"
-                id="json-upload"
-              />
-              <label htmlFor="json-upload" className="w-full">
-                <Button className="w-full flex items-center gap-2" variant="outline" asChild>
-                  <span>
-                    <FileJson className="h-4 w-4" />
-                    Upload JSON File
-                  </span>
-                </Button>
-              </label>
-            </div>
-          </CardContent>
-        </Card>
+        <ImportSection />
 
         <Card>
           <CardHeader>
@@ -153,7 +128,10 @@ export default function Database() {
             <p className="text-sm text-muted-foreground">
               Create a backup of the entire database. This includes all member records, payments, and system settings.
             </p>
-            <Button className="w-full flex items-center gap-2">
+            <Button 
+              className="w-full flex items-center gap-2"
+              onClick={handleBackup}
+            >
               <Download className="h-4 w-4" />
               Download Backup
             </Button>
@@ -168,9 +146,40 @@ export default function Database() {
             <p className="text-sm text-muted-foreground">
               Restore the database from a previous backup file. Please ensure you have a valid backup file.
             </p>
-            <Button className="w-full flex items-center gap-2" variant="outline">
+            <input
+              type="file"
+              accept=".json"
+              onChange={handleRestore}
+              ref={fileInputRef}
+              className="hidden"
+              id="restore-file"
+            />
+            <Button 
+              className="w-full flex items-center gap-2" 
+              variant="outline"
+              onClick={() => fileInputRef.current?.click()}
+            >
               <Upload className="h-4 w-4" />
               Upload Backup
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Database Maintenance</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Clean up duplicate collectors and maintain database integrity.
+            </p>
+            <Button 
+              className="w-full flex items-center gap-2"
+              onClick={handleCleanupDuplicates}
+              disabled={isCleaningUp}
+            >
+              <Merge className="h-4 w-4" />
+              {isCleaningUp ? "Cleaning up..." : "Clean Up Duplicates"}
             </Button>
           </CardContent>
         </Card>

@@ -1,18 +1,56 @@
 import { Link, useNavigate } from "react-router-dom";
-import { Button } from "@/components/ui/button";
-import { ThemeToggle } from "@/components/ThemeToggle";
+import { Button } from "./ui/button";
+import { ThemeToggle } from "./ThemeToggle";
 import { Menu } from "lucide-react";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { useState } from "react";
+import { Sheet, SheetContent, SheetTrigger } from "./ui/sheet";
+import { useState, useEffect } from "react";
+import { supabase } from "../integrations/supabase/client";
 
 export function NavigationMenu() {
   const [open, setOpen] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const navigate = useNavigate();
+
+    useEffect(() => {
+        const checkSession = async () => {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session) {
+                setIsLoggedIn(true);
+            } else {
+                setIsLoggedIn(false);
+            }
+        };
+
+        checkSession();
+
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+            if (event === "SIGNED_IN" && session) {
+                setIsLoggedIn(true);
+            } else if (event === "SIGNED_OUT") {
+                setIsLoggedIn(false);
+            }
+        });
+
+        return () => {
+            subscription.unsubscribe();
+        };
+    }, []);
+
 
   const handleNavigation = (path: string) => {
     setOpen(false);
     navigate(path);
   };
+
+    const handleLogout = async () => {
+        try {
+            await supabase.auth.signOut();
+            setIsLoggedIn(false);
+            navigate("/login");
+        } catch (error) {
+            console.error("Logout error:", error);
+        }
+    };
 
   return (
     <nav className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
@@ -25,21 +63,29 @@ export function NavigationMenu() {
 
         {/* Desktop Navigation */}
         <div className="hidden md:flex items-center space-x-2">
-          <Link to="/login">
-            <Button variant="outline" size="sm">
-              Login
-            </Button>
-          </Link>
+            {isLoggedIn ? (
+                <Button variant="outline" size="sm" onClick={handleLogout}>
+                    Logout
+                </Button>
+            ) : (
+                <Link to="/login">
+                    <Button variant="outline" size="sm">
+                        Login
+                    </Button>
+                </Link>
+            )}
           <Link to="/register">
             <Button variant="default" size="sm">
               Register
             </Button>
           </Link>
-          <Link to="/admin">
-            <Button variant="outline" size="sm">
-              Admin Panel
-            </Button>
-          </Link>
+          {isLoggedIn && (
+            <Link to="/admin">
+              <Button variant="outline" size="sm">
+                Admin Panel
+              </Button>
+            </Link>
+          )}
           <ThemeToggle />
         </div>
 
@@ -58,13 +104,23 @@ export function NavigationMenu() {
                 <div className="text-xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent mb-4">
                   Menu
                 </div>
-                <Button
-                  variant="outline"
-                  className="justify-start bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-700 dark:text-blue-300"
-                  onClick={() => handleNavigation("/login")}
-                >
-                  Login
-                </Button>
+                  {isLoggedIn ? (
+                      <Button
+                          variant="outline"
+                          className="justify-start bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-700 dark:text-blue-300"
+                          onClick={handleLogout}
+                      >
+                          Logout
+                      </Button>
+                  ) : (
+                      <Button
+                          variant="outline"
+                          className="justify-start bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-700 dark:text-blue-300"
+                          onClick={() => handleNavigation("/login")}
+                      >
+                          Login
+                      </Button>
+                  )}
                 <Button
                   variant="outline"
                   className="justify-start bg-purple-50 dark:bg-purple-900/20 hover:bg-purple-100 dark:hover:bg-purple-900/30 text-purple-700 dark:text-purple-300"
@@ -72,13 +128,15 @@ export function NavigationMenu() {
                 >
                   Register
                 </Button>
-                <Button
-                  variant="outline"
-                  className="justify-start bg-emerald-50 dark:bg-emerald-900/20 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300"
-                  onClick={() => handleNavigation("/admin")}
-                >
-                  Admin Panel
-                </Button>
+                {isLoggedIn && (
+                  <Button
+                    variant="outline"
+                    className="justify-start bg-emerald-50 dark:bg-emerald-900/20 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300"
+                    onClick={() => handleNavigation("/admin")}
+                  >
+                    Admin Panel
+                  </Button>
+                )}
               </div>
             </SheetContent>
           </Sheet>

@@ -1,179 +1,140 @@
 import { useState } from "react";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Search, UserPlus, ChevronDown, ChevronRight, Edit2, Trash2, UserCheck, Ban } from "lucide-react";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { useQuery } from "@tanstack/react-query";
 import { useToast } from "@/components/ui/use-toast";
-import { useIsMobile } from "@/hooks/use-mobile";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { supabase } from "@/integrations/supabase/client";
+import { importDataFromJson } from "@/utils/importData";
+import { EditCollectorDialog } from "@/components/collectors/EditCollectorDialog";
+import { CollectorList } from "@/components/collectors/CollectorList";
+import { syncCollectorIds } from "@/utils/databaseOperations";
+import { CollectorHeader } from "@/components/collectors/CollectorHeader";
+import { CollectorSearch } from "@/components/collectors/CollectorSearch";
+import { PrintTemplate } from "@/components/collectors/PrintTemplate";
 
 export default function Collectors() {
   const [searchTerm, setSearchTerm] = useState("");
   const [expandedCollector, setExpandedCollector] = useState<string | null>(null);
+  const [editingCollector, setEditingCollector] = useState<{ id: string; name: string } | null>(null);
   const { toast } = useToast();
-  const isMobile = useIsMobile();
 
-  const toggleCollector = (collectorId: string) => {
-    setExpandedCollector(expandedCollector === collectorId ? null : collectorId);
+  const { data: collectors, isLoading, refetch } = useQuery({
+    queryKey: ['collectors'],
+    queryFn: async () => {
+      console.log('Starting collectors fetch process...');
+      
+      // First, get all collectors
+      const { data: collectorsData, error: collectorsError } = await supabase
+        .from('collectors')
+        .select('*')
+        .order('name');
+
+      if (collectorsError) {
+        console.error('Error fetching collectors:', collectorsError);
+        throw collectorsError;
+      }
+
+      // Then, get all members
+      const { data: membersData, error: membersError } = await supabase
+        .from('members')
+        .select('*')
+        .order('full_name');
+
+      if (membersError) {
+        console.error('Error fetching members:', membersError);
+        throw membersError;
+      }
+
+      console.log('Raw collectors data:', collectorsData);
+      console.log('Raw members data:', membersData);
+
+      // Map members to their collectors using the collector field
+      const enhancedCollectorsData = collectorsData.map(collector => {
+        // Normalize collector names for comparison
+        const normalizeCollectorName = (name: string) => {
+          return name?.trim().toLowerCase().replace(/\s+/g, ' ') || '';
+        };
+
+        const collectorName = normalizeCollectorName(collector.name);
+        
+        // Find all members that belong to this collector using the collector field
+        const collectorMembers = membersData?.filter(member => {
+          const memberCollector = normalizeCollectorName(member.collector);
+          return memberCollector === collectorName;
+        }) || [];
+
+        console.log(`Members for collector ${collector.name}:`, {
+          collectorName,
+          memberCount: collectorMembers.length,
+          members: collectorMembers
+        });
+
+        return {
+          ...collector,
+          members: collectorMembers
+        };
+      });
+
+      console.log('Enhanced collectors data:', enhancedCollectorsData);
+      return enhancedCollectorsData;
+    }
+  });
+
+  const handleImportData = async () => {
+    const result = await importDataFromJson();
+    if (result.success) {
+      toast({
+        title: "Data imported successfully",
+        description: "The collectors and members data has been imported.",
+      });
+      refetch();
+    } else {
+      toast({
+        title: "Import failed",
+        description: "There was an error importing the data.",
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleDeleteCollector = (collectorId: string) => {
-    toast({
-      title: "Collector deleted",
-      description: `Collector ${collectorId} has been removed.`,
-    });
+  const handlePrintAll = () => {
+    const printContent = PrintTemplate({ collectors });
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(printContent);
+      printWindow.document.close();
+      printWindow.print();
+    }
   };
-
-  const handleActivateCollector = (collectorId: string) => {
-    toast({
-      title: "Collector activated",
-      description: `Collector ${collectorId} has been activated.`,
-    });
-  };
-
-  const handleDeactivateCollector = (collectorId: string) => {
-    toast({
-      title: "Collector deactivated",
-      description: `Collector ${collectorId} has been deactivated.`,
-    });
-  };
-
-  // Sample data structure
-  const collectors = [
-    {
-      id: "01",
-      name: "Anjum Riaz",
-      members: 161,
-      membersList: [
-        { name: "Mohammed Ali / Micheal Cashmore (updated)", memberId: "AR01001", email: "", contact: "", address: "Askew way, woodville DE11 8FX" },
-        { name: "Khadam Hussain", memberId: "AR01002", email: "", contact: "", address: "Ash st" },
-      ]
-    },
-    {
-      id: "02",
-      name: "Zabbie",
-      members: 116,
-      membersList: [
-        { name: "Naveed Zabbie", memberId: "Z02001", email: "", contact: "", address: "Grange St" },
-      ]
-    },
-  ];
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col space-y-4">
-        <h1 className="text-4xl font-bold text-white">
-          Collectors Management
-        </h1>
-        <Button className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white w-full md:w-auto">
-          <UserPlus className="h-4 w-4" />
-          Add New Collector
-        </Button>
-      </div>
+      <CollectorHeader 
+        onImportData={handleImportData}
+        onPrintAll={handlePrintAll}
+      />
 
-      <div className="flex items-center space-x-2">
-        <div className="relative flex-1">
-          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input 
-            placeholder="Search by member ID or name..." 
-            className="pl-8" 
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
-      </div>
+      <CollectorSearch 
+        searchTerm={searchTerm}
+        onSearchChange={setSearchTerm}
+      />
 
-      <ScrollArea className="h-[calc(100vh-220px)]">
-        <div className="space-y-4">
-          {collectors.map((collector) => (
-            <Card key={collector.id}>
-              <CardHeader className="py-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4 min-w-0">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => toggleCollector(collector.id)}
-                      className="bg-blue-600 hover:bg-blue-700 text-white shrink-0"
-                      title={expandedCollector === collector.id ? "Collapse" : "Expand"}
-                    >
-                      {expandedCollector === collector.id ? (
-                        <ChevronDown className="h-4 w-4" />
-                      ) : (
-                        <ChevronRight className="h-4 w-4" />
-                      )}
-                    </Button>
-                    <div className="min-w-0">
-                      <CardTitle className="text-xl text-white truncate">
-                        {collector.id} - {collector.name}
-                      </CardTitle>
-                      <p className="text-sm text-white">
-                        Members: {collector.members}
-                      </p>
-                    </div>
-                  </div>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="outline" className="ml-4 shrink-0">
-                        Actions <ChevronDown className="ml-2 h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-48">
-                      <DropdownMenuItem onClick={() => handleActivateCollector(collector.id)} className="gap-2">
-                        <UserCheck className="h-4 w-4" /> Activate
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleDeactivateCollector(collector.id)} className="gap-2">
-                        <Ban className="h-4 w-4" /> Deactivate
-                      </DropdownMenuItem>
-                      <DropdownMenuItem className="gap-2">
-                        <Edit2 className="h-4 w-4" /> Edit Details
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleDeleteCollector(collector.id)} className="gap-2 text-red-600">
-                        <Trash2 className="h-4 w-4" /> Delete
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              </CardHeader>
-              {expandedCollector === collector.id && (
-                <CardContent>
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="text-white">Name</TableHead>
-                          <TableHead className="text-white">Member ID</TableHead>
-                          <TableHead className="text-white">Email</TableHead>
-                          <TableHead className="text-white">Contact Number</TableHead>
-                          <TableHead className="text-white">Address</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {collector.membersList.map((member) => (
-                          <TableRow key={member.memberId}>
-                            <TableCell className="text-white">{member.name}</TableCell>
-                            <TableCell className="text-white">{member.memberId}</TableCell>
-                            <TableCell className="text-white">{member.email}</TableCell>
-                            <TableCell className="text-white">{member.contact}</TableCell>
-                            <TableCell className="text-white">{member.address}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </CardContent>
-              )}
-            </Card>
-          ))}
-        </div>
-      </ScrollArea>
+      <CollectorList
+        collectors={collectors || []}
+        expandedCollector={expandedCollector}
+        onToggleCollector={setExpandedCollector}
+        onEditCollector={setEditingCollector}
+        onUpdate={refetch}
+        isLoading={isLoading}
+        searchTerm={searchTerm}
+      />
+
+      {editingCollector && (
+        <EditCollectorDialog
+          isOpen={true}
+          onClose={() => setEditingCollector(null)}
+          collector={editingCollector}
+          onUpdate={refetch}
+        />
+      )}
     </div>
   );
 }
