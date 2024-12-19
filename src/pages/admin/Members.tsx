@@ -1,65 +1,63 @@
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { useState, useCallback } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { MemberCard } from "@/components/members/MemberCard";
 import { MembersHeader } from "@/components/members/MembersHeader";
 import { MembersSearch } from "@/components/members/MembersSearch";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { CoveredMembersOverview } from "@/components/members/CoveredMembersOverview";
-import type { Member } from "@/components/members/types";
+import { MembersPagination } from "@/components/members/MembersPagination";
+import { useMembers } from "@/hooks/use-members";
+import { useToast } from "@/hooks/use-toast";
+
+const ITEMS_PER_PAGE = 20;
 
 export default function Members() {
   const [searchTerm, setSearchTerm] = useState("");
   const [expandedMember, setExpandedMember] = useState<string | null>(null);
   const [editingNotes, setEditingNotes] = useState<string | null>(null);
+  const [page, setPage] = useState(0);
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
 
-  const { data: members, isLoading } = useQuery<Member[]>({
-    queryKey: ['members'],
-    queryFn: async () => {
-      console.log('Fetching members...');
-      const { data, error, count } = await supabase
-        .from('members')
-        .select('*', { count: 'exact' });
-      
-      if (error) {
-        console.error('Error fetching members:', error);
-        throw error;
-      }
-      
-      // Log the actual count from the database
-      console.log('Total members count:', count);
-      console.log('Members data length:', data?.length);
-      
-      // Map the full_name to name for CoveredMembersOverview compatibility
-      const mappedData = data.map(member => ({
-        ...member,
-        name: member.full_name
-      }));
-      
-      return mappedData;
-    }
-  });
+  const { data, isLoading, error } = useMembers(page, searchTerm);
 
-  const filteredMembers = members?.filter(member => 
-    member.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    member.member_number.toLowerCase().includes(searchTerm.toLowerCase())
-  ) || [];
+  const handleUpdate = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ['members'] });
+  }, [queryClient]);
 
-  const toggleMember = (id: string) => {
-    setExpandedMember(expandedMember === id ? null : id);
-  };
+  const toggleMember = useCallback((id: string) => {
+    setExpandedMember(prev => prev === id ? null : id);
+  }, []);
+
+  const totalPages = Math.ceil((data?.totalCount || 0) / ITEMS_PER_PAGE);
+
+  if (error) {
+    console.error('Members component error:', error);
+    return (
+      <div className="space-y-6">
+        <MembersHeader />
+        <div className="text-center text-red-500 py-4">
+          Failed to load members. Please try again later.
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
       <MembersHeader />
-      <MembersSearch searchTerm={searchTerm} setSearchTerm={setSearchTerm} />
+      <MembersSearch 
+        searchTerm={searchTerm} 
+        setSearchTerm={setSearchTerm} 
+        isLoading={isLoading}
+      />
       
-      {members && (
+      {data?.members && (
         <>
           <div className="text-sm text-muted-foreground mb-2">
-            Total Members: {members.length}
+            Total Members: {data.totalCount}
           </div>
-          <CoveredMembersOverview members={members} />
+          <CoveredMembersOverview members={data.members} />
         </>
       )}
 
@@ -69,23 +67,37 @@ export default function Members() {
             <div className="flex items-center justify-center p-8">
               <div className="text-muted-foreground">Loading members...</div>
             </div>
-          ) : filteredMembers.length === 0 ? (
+          ) : !data?.members ? (
+            <div className="flex items-center justify-center p-8">
+              <div className="text-muted-foreground">No data available</div>
+            </div>
+          ) : data.members.length === 0 ? (
             <div className="flex items-center justify-center p-8">
               <div className="text-muted-foreground">
                 {searchTerm ? "No members found matching your search" : "No members found"}
               </div>
             </div>
           ) : (
-            filteredMembers.map((member) => (
-              <MemberCard
-                key={member.id}
-                member={member}
-                expandedMember={expandedMember}
-                editingNotes={editingNotes}
-                toggleMember={toggleMember}
-                setEditingNotes={setEditingNotes}
+            <>
+              {data.members.map((member) => (
+                <MemberCard
+                  key={member.id}
+                  member={member}
+                  expandedMember={expandedMember}
+                  editingNotes={editingNotes}
+                  toggleMember={toggleMember}
+                  setEditingNotes={setEditingNotes}
+                  onUpdate={handleUpdate}
+                />
+              ))}
+              
+              <MembersPagination 
+                page={page}
+                totalPages={totalPages}
+                isLoading={isLoading}
+                setPage={setPage}
               />
-            ))
+            </>
           )}
         </div>
       </ScrollArea>

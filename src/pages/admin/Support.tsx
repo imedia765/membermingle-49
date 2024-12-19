@@ -9,24 +9,9 @@ import { TicketDetailsDialog } from "@/components/support/TicketDetailsDialog";
 import { useToast } from "@/hooks/use-toast";
 import { NoticesSection } from "@/components/support/NoticesSection";
 import { useState } from "react";
-
-interface TicketResponse {
-  id: string;
-  message: string;
-  createdAt: string;
-  isAdmin: boolean;
-}
-
-interface Ticket {
-  id: string;
-  subject: string;
-  status: string;
-  priority: string;
-  createdAt: string;
-  requester: string;
-  message?: string;
-  responses: TicketResponse[];
-}
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { Ticket } from "@/types/support";
 
 export default function Support() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -36,43 +21,43 @@ export default function Support() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const { toast } = useToast();
 
-  const [tickets] = useState<Ticket[]>([
-    {
-      id: "T-001",
-      subject: "Account Access Issue",
-      status: "Open",
-      priority: "High",
-      createdAt: "2024-03-15",
-      requester: "John Doe",
-      message: "I cannot access my account after the recent update.",
-      responses: [
-        {
-          id: "R1",
-          message: "Have you tried clearing your browser cache?",
-          createdAt: "2024-03-15T10:30:00",
-          isAdmin: true,
-        },
-        {
-          id: "R2",
-          message: "Yes, I tried that but still having issues.",
-          createdAt: "2024-03-15T11:00:00",
-          isAdmin: false,
-        },
-      ],
+  const { data: tickets = [], isLoading } = useQuery({
+    queryKey: ['tickets'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('support_tickets')
+        .select(`
+          *,
+          member:member_id (
+            full_name
+          ),
+          ticket_responses (
+            *
+          )
+        `)
+        .neq('status', 'notice')
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      return data as unknown as Ticket[];
     },
-    {
-      id: "T-002",
-      subject: "Payment Processing Error",
-      status: "In Progress",
-      priority: "Medium",
-      createdAt: "2024-03-14",
-      requester: "Jane Smith",
-      message: "Payment failed multiple times.",
-      responses: [],
-    },
-  ]);
+  });
 
-  const handleStatusChange = (ticketId: string, newStatus: string) => {
+  const handleStatusChange = async (ticketId: string, newStatus: string) => {
+    const { error } = await supabase
+      .from('support_tickets')
+      .update({ status: newStatus })
+      .eq('id', ticketId);
+
+    if (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update ticket status",
+        variant: "destructive",
+      });
+      return;
+    }
+
     toast({
       title: "Status Updated",
       description: `Ticket ${ticketId} status changed to ${newStatus}`,
@@ -80,8 +65,9 @@ export default function Support() {
   };
 
   const filteredTickets = tickets.filter((ticket) => {
-    const matchesSearch = ticket.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      ticket.requester.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    const matchesSearch = 
+      ticket.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (ticket.member?.full_name?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
       ticket.id.toLowerCase().includes(searchQuery.toLowerCase());
 
     const matchesStatus = statusFilter === "all" || ticket.status === statusFilter;
@@ -118,10 +104,10 @@ export default function Support() {
                 onChange={(e) => setStatusFilter(e.target.value)}
               >
                 <option value="all">All Status</option>
-                <option value="Open">Open</option>
-                <option value="In Progress">In Progress</option>
-                <option value="Resolved">Resolved</option>
-                <option value="Closed">Closed</option>
+                <option value="open">Open</option>
+                <option value="in_progress">In Progress</option>
+                <option value="resolved">Resolved</option>
+                <option value="closed">Closed</option>
               </select>
               <select
                 className="border rounded px-2 py-1"
@@ -129,9 +115,9 @@ export default function Support() {
                 onChange={(e) => setPriorityFilter(e.target.value)}
               >
                 <option value="all">All Priority</option>
-                <option value="High">High</option>
-                <option value="Medium">Medium</option>
-                <option value="Low">Low</option>
+                <option value="high">High</option>
+                <option value="medium">Medium</option>
+                <option value="low">Low</option>
               </select>
             </div>
           </div>
@@ -151,36 +137,46 @@ export default function Support() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredTickets.map((ticket) => (
-                  <TableRow key={ticket.id}>
-                    <TableCell>{ticket.id}</TableCell>
-                    <TableCell>{ticket.subject}</TableCell>
-                    <TableCell>
-                      <Badge variant={ticket.status === "Open" ? "destructive" : "default"}>
-                        {ticket.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={ticket.priority === "High" ? "destructive" : "default"}>
-                        {ticket.priority}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{ticket.createdAt}</TableCell>
-                    <TableCell>{ticket.requester}</TableCell>
-                    <TableCell>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setSelectedTicket(ticket);
-                          setIsDialogOpen(true);
-                        }}
-                      >
-                        View Details
-                      </Button>
-                    </TableCell>
+                {isLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center">Loading tickets...</TableCell>
                   </TableRow>
-                ))}
+                ) : filteredTickets.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center">No tickets found</TableCell>
+                  </TableRow>
+                ) : (
+                  filteredTickets.map((ticket) => (
+                    <TableRow key={ticket.id}>
+                      <TableCell>{ticket.id}</TableCell>
+                      <TableCell>{ticket.subject}</TableCell>
+                      <TableCell>
+                        <Badge variant={ticket.status === "open" ? "destructive" : "default"}>
+                          {ticket.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={ticket.priority === "high" ? "destructive" : "default"}>
+                          {ticket.priority}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>{new Date(ticket.created_at).toLocaleDateString()}</TableCell>
+                      <TableCell>{ticket.member?.full_name || 'Unknown'}</TableCell>
+                      <TableCell>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedTicket(ticket);
+                            setIsDialogOpen(true);
+                          }}
+                        >
+                          View Details
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </ScrollArea>

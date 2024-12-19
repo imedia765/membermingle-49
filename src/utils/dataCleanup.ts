@@ -17,15 +17,14 @@ export function removeEmptyFields<T extends Record<string, any>>(obj: T): Partia
 }
 
 async function getNextCollectorNumber(): Promise<string> {
-  const { data: lastCollector } = await supabase
+  const { data: collectors } = await supabase
     .from('collectors')
     .select('number')
     .order('number', { ascending: false })
-    .limit(1)
-    .single();
+    .limit(1);
 
-  const nextNumber = lastCollector 
-    ? String(Number(lastCollector.number) + 1).padStart(2, '0')
+  const nextNumber = collectors && collectors.length > 0
+    ? String(Number(collectors[0].number) + 1).padStart(2, '0')
     : '01';
     
   return nextNumber;
@@ -73,14 +72,13 @@ export async function transformCollectorForSupabase(collectorName: string): Prom
   }
 
   // First check if collector already exists
-  const { data: existingCollector } = await supabase
+  const { data: existingCollectors } = await supabase
     .from('collectors')
     .select('*')
-    .ilike('name', collectorName)
-    .single();
+    .ilike('name', collectorName);
 
-  if (existingCollector) {
-    console.log('Collector already exists:', existingCollector);
+  if (existingCollectors && existingCollectors.length > 0) {
+    console.log('Collector already exists:', existingCollectors[0]);
     return null; // Return null to indicate we should use existing collector
   }
 

@@ -1,5 +1,5 @@
-import { Link, Outlet, useNavigate } from "react-router-dom";
-import { LayoutDashboard, Users, UserCheck, ClipboardList, Database, DollarSign, UserCircle, ChevronDown, HeadsetIcon } from "lucide-react";
+import { Link, Outlet, useNavigate, useLocation } from "react-router-dom";
+import { LayoutDashboard, Users, UserCheck, ClipboardList, Database, DollarSign, UserCircle, ChevronDown, HeadsetIcon, RefreshCw } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -7,8 +7,10 @@ import {
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
 import { Button } from "./ui/button";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { supabase } from "../integrations/supabase/client";
+import { useToast } from "./ui/use-toast";
+import { useQueryClient } from "@tanstack/react-query";
 
 const menuItems = [
   { icon: LayoutDashboard, label: "Dashboard", to: "/admin" },
@@ -23,47 +25,113 @@ const menuItems = [
 
 export function AdminLayout() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const checkSession = useCallback(async () => {
+    try {
+      const { data: { session }, error } = await supabase.auth.getSession();
+      if (error) throw error;
+      
+      if (!session && location.pathname !== '/login') {
+        navigate("/login");
+        return false;
+      }
+      
+      return !!session;
+    } catch (error) {
+      console.error('Session check error:', error);
+      toast({
+        title: "Authentication Error",
+        description: "Please try logging in again",
+        variant: "destructive",
+      });
+      navigate("/login");
+      return false;
+    }
+  }, [navigate, toast, location.pathname]);
 
   useEffect(() => {
-    const checkSession = async () => {
+    let isActive = true;
+    let refreshInterval: NodeJS.Timeout;
+
+    const initializeAuth = async () => {
+      if (!isActive) return;
+      
       setLoading(true);
-      const { data: { session } } = await supabase.auth.getSession();
-      setIsLoggedIn(!!session);
-      setLoading(false);
+      const hasSession = await checkSession();
+      if (isActive) {
+        setIsLoggedIn(hasSession);
+        setLoading(false);
+      }
     };
 
-    checkSession();
+    initializeAuth();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    // Set up auth state change listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!isActive) return;
+      
+      console.log("Auth state changed:", event);
       setIsLoggedIn(!!session);
+      
+      if (!session && location.pathname !== '/login') {
+        navigate("/login");
+      }
     });
 
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, [navigate]);
+    // Set up controlled query refresh interval
+    if (isLoggedIn) {
+      refreshInterval = setInterval(() => {
+        queryClient.invalidateQueries({ 
+          predicate: (query) => !query.queryKey.includes('static')
+        });
+      }, 30000);
+    }
 
+    // Cleanup function
+    return () => {
+      isActive = false;
+      subscription.unsubscribe();
+      if (refreshInterval) {
+        clearInterval(refreshInterval);
+      }
+    };
+  }, [navigate, queryClient, location.pathname, isLoggedIn, checkSession]);
+
+  const handleNavigation = useCallback((path: string) => {
+    if (location.pathname !== path) {
+      queryClient.cancelQueries();
+      navigate(path);
+    }
+  }, [location.pathname, navigate, queryClient]);
 
   if (loading) {
-    return <div>Loading...</div>;
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin">
+          <RefreshCw className="h-8 w-8 text-primary" />
+        </div>
+      </div>
+    );
   }
 
   if (!isLoggedIn) {
-    navigate("/login");
     return null;
   }
 
   return (
     <div className="min-h-screen flex flex-col w-full bg-background">
       <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container py-2">
+        <div className="container">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
                 variant="default"
-                className="w-full justify-between h-12"
+                className="w-full justify-between h-12 hover:bg-primary/90 transition-colors my-2"
               >
                 <span className="font-semibold">Menu</span>
                 <ChevronDown className="h-4 w-4 opacity-50" />
@@ -73,7 +141,7 @@ export function AdminLayout() {
               {menuItems.map((item) => (
                 <DropdownMenuItem
                   key={item.to}
-                  onClick={() => navigate(item.to)}
+                  onClick={() => handleNavigation(item.to)}
                   className="flex items-center gap-3 cursor-pointer py-3 px-4 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-700 dark:hover:text-blue-300 text-base"
                 >
                   <item.icon className="h-5 w-5" />

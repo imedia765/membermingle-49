@@ -24,26 +24,45 @@ export function EditCollectorDialog({ isOpen, onClose, collector, onUpdate }: Ed
     e.preventDefault();
     setIsLoading(true);
 
-    const { error } = await supabase
-      .from('collectors')
-      .update({ name })
-      .eq('id', collector.id);
+    try {
+      // Update collector name
+      const { error: updateError } = await supabase
+        .from('collectors')
+        .update({ 
+          name,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', collector.id);
 
-    setIsLoading(false);
+      if (updateError) throw updateError;
 
-    if (error) {
+      // Update all members' collector field to match new name
+      const { error: membersUpdateError } = await supabase
+        .from('members')
+        .update({ 
+          collector: name,
+          updated_at: new Date().toISOString()
+        })
+        .eq('collector_id', collector.id);
+
+      if (membersUpdateError) throw membersUpdateError;
+
+      toast({
+        title: "Success",
+        description: "Collector name updated successfully. Member numbers will be updated automatically.",
+      });
+      
+      onUpdate();
+      onClose();
+    } catch (error) {
+      console.error('Error updating collector:', error);
       toast({
         title: "Error",
         description: "Failed to update collector name",
         variant: "destructive",
       });
-    } else {
-      toast({
-        title: "Success",
-        description: "Collector name updated successfully",
-      });
-      onUpdate();
-      onClose();
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -60,6 +79,7 @@ export function EditCollectorDialog({ isOpen, onClose, collector, onUpdate }: Ed
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Enter collector name"
+                className="w-full"
               />
             </div>
           </div>
@@ -72,7 +92,7 @@ export function EditCollectorDialog({ isOpen, onClose, collector, onUpdate }: Ed
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={isLoading}>
+            <Button type="submit" disabled={isLoading || !name.trim() || name === collector.name}>
               Save Changes
             </Button>
           </DialogFooter>

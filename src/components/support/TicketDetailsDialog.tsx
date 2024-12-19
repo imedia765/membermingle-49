@@ -11,24 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/components/ui/use-toast";
-
-interface TicketResponse {
-  id: string;
-  message: string;
-  createdAt: string;
-  isAdmin: boolean;
-}
-
-interface Ticket {
-  id: string;
-  subject: string;
-  status: string;
-  priority: string;
-  createdAt: string;
-  requester: string;
-  message?: string;
-  responses: TicketResponse[];
-}
+import { Ticket, TicketResponse } from "@/types/support";
 
 interface TicketDetailsDialogProps {
   ticket: Ticket | null;
@@ -86,35 +69,35 @@ export function TicketDetailsDialog({
         <div className="space-y-4">
           <div>
             <h3 className="font-semibold mb-2">Requester</h3>
-            <p>{ticket.requester}</p>
+            <p>{ticket.member?.full_name || 'Unknown'}</p>
           </div>
 
           <div>
             <h3 className="font-semibold mb-2">Original Message</h3>
-            <p className="text-muted-foreground">{ticket.message}</p>
+            <p className="text-muted-foreground">{ticket.description}</p>
           </div>
 
           <div>
             <h3 className="font-semibold mb-2">Responses</h3>
             <ScrollArea className="h-[200px] border rounded-md p-4">
-              {ticket.responses.map((response) => (
+              {(ticket.ticket_responses || []).map((response) => (
                 <div
                   key={response.id}
                   className={`mb-4 p-3 rounded-lg ${
-                    response.isAdmin
+                    response.responder_id
                       ? "bg-primary/10 ml-4"
                       : "bg-muted mr-4"
                   }`}
                 >
                   <div className="flex justify-between text-sm mb-2">
                     <span className="font-medium">
-                      {response.isAdmin ? "Support Agent" : "Requester"}
+                      {response.responder_id ? "Support Agent" : "Requester"}
                     </span>
                     <span className="text-muted-foreground">
-                      {new Date(response.createdAt).toLocaleString()}
+                      {new Date(response.created_at).toLocaleString()}
                     </span>
                   </div>
-                  <p>{response.message}</p>
+                  <p>{response.response}</p>
                 </div>
               ))}
             </ScrollArea>

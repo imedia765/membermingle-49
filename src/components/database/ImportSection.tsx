@@ -4,6 +4,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { ImportStatus } from "./ImportStatus";
 import { ImportButton } from "./ImportButton";
+import { Checkbox } from "@/components/ui/checkbox";
 import { importMembersFromCsv } from "@/utils/csvImport";
 import { processCollectors, processMembers } from "@/utils/importHelpers";
 
@@ -12,6 +13,7 @@ export function ImportSection() {
   const [isImporting, setIsImporting] = useState(false);
   const [session, setSession] = useState<any>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [removeMemberNumbers, setRemoveMemberNumbers] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -53,14 +55,22 @@ export function ImportSection() {
         throw new Error('Invalid CSV data format');
       }
       
-      console.log('CSV data loaded:', result);
+      console.log('CSV data loaded:', result.length, 'members');
 
-      const collectorIdMap = await processCollectors(result, session.user.id);
-      await processMembers(result, collectorIdMap, session.user.id);
+      // If removeMemberNumbers is true, remove member_number from each record
+      const processedData = removeMemberNumbers 
+        ? result.map(({ member_number, ...rest }) => rest)
+        : result;
+
+      const collectorIdMap = await processCollectors(processedData, session.user.id);
+      console.log('Collectors processed, starting member import...');
+      
+      const importedCount = await processMembers(processedData, collectorIdMap, session.user.id);
+      console.log('Members import completed:', importedCount, 'members processed');
 
       toast({
         title: "Import successful",
-        description: "Members have been imported into the database",
+        description: `${importedCount} members have been imported into the database`,
       });
     } catch (error) {
       console.error('Import error:', error);
@@ -85,6 +95,19 @@ export function ImportSection() {
           Import member data from processed_members.csv file into the database.
           This will create new records and update existing ones.
         </p>
+        <div className="flex items-center space-x-2">
+          <Checkbox
+            id="removeMemberNumbers"
+            checked={removeMemberNumbers}
+            onCheckedChange={(checked) => setRemoveMemberNumbers(checked as boolean)}
+          />
+          <label
+            htmlFor="removeMemberNumbers"
+            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+          >
+            Remove existing member numbers and let Supabase generate new ones
+          </label>
+        </div>
         <ImportButton 
           onClick={importData}
           isImporting={isImporting}

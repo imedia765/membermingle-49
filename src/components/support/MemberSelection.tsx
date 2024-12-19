@@ -1,94 +1,12 @@
+import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Member } from "@/components/members/types";
-
-const SAMPLE_MEMBERS: Member[] = [
-  { 
-    id: "1", 
-    full_name: "John Doe", 
-    collector: "Anjum Riaz Group",
-    member_number: "AR001",
-    collector_id: null,
-    date_of_birth: null,
-    gender: null,
-    marital_status: null,
-    email: null,
-    phone: null,
-    address: null,
-    postcode: null,
-    town: null,
-    status: null,
-    verified: null,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    membership_type: null,
-    cors_enabled: null
-  },
-  { 
-    id: "2", 
-    full_name: "Jane Smith", 
-    collector: "Zabbie Group",
-    member_number: "ZB001",
-    collector_id: null,
-    date_of_birth: null,
-    gender: null,
-    marital_status: null,
-    email: null,
-    phone: null,
-    address: null,
-    postcode: null,
-    town: null,
-    status: null,
-    verified: null,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    membership_type: null,
-    cors_enabled: null
-  },
-  { 
-    id: "3", 
-    full_name: "Alice Johnson", 
-    collector: "Anjum Riaz Group",
-    member_number: "AR002",
-    collector_id: null,
-    date_of_birth: null,
-    gender: null,
-    marital_status: null,
-    email: null,
-    phone: null,
-    address: null,
-    postcode: null,
-    town: null,
-    status: null,
-    verified: null,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    membership_type: null,
-    cors_enabled: null
-  },
-  { 
-    id: "4", 
-    full_name: "Bob Wilson", 
-    collector: "Zabbie Group",
-    member_number: "ZB002",
-    collector_id: null,
-    date_of_birth: null,
-    gender: null,
-    marital_status: null,
-    email: null,
-    phone: null,
-    address: null,
-    postcode: null,
-    town: null,
-    status: null,
-    verified: null,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    membership_type: null,
-    cors_enabled: null
-  }
-];
+import { supabase } from "@/integrations/supabase/client";
 
 interface MemberSelectionProps {
   selectedMembers: string[];
@@ -96,11 +14,56 @@ interface MemberSelectionProps {
 }
 
 export function MemberSelection({ selectedMembers, setSelectedMembers }: MemberSelectionProps) {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedCollector, setSelectedCollector] = useState<string>("all");
+
+  // Fetch members
+  const { data: members = [], isLoading: isLoadingMembers } = useQuery({
+    queryKey: ['members'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('members')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching members:', error);
+        throw error;
+      }
+      return data as Member[];
+    },
+  });
+
+  // Fetch collectors
+  const { data: collectors = [] } = useQuery({
+    queryKey: ['collectors'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('collectors')
+        .select('*')
+        .order('name');
+
+      if (error) {
+        console.error('Error fetching collectors:', error);
+        throw error;
+      }
+      return data;
+    },
+  });
+
+  // Filter members based on search and collector
+  const filteredMembers = members.filter((member) => {
+    const matchesSearch = member.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         member.member_number.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCollector = selectedCollector === "all" || member.collector_id === selectedCollector;
+    return matchesSearch && matchesCollector;
+  });
+
   const handleSelectAll = () => {
-    if (selectedMembers.length === SAMPLE_MEMBERS.length) {
+    if (selectedMembers.length === filteredMembers.length) {
       setSelectedMembers([]);
     } else {
-      setSelectedMembers(SAMPLE_MEMBERS.map(member => member.id));
+      setSelectedMembers(filteredMembers.map(member => member.id));
     }
   };
 
@@ -114,29 +77,73 @@ export function MemberSelection({ selectedMembers, setSelectedMembers }: MemberS
 
   return (
     <div className="space-y-4">
+      <div className="flex gap-4">
+        <div className="flex-1">
+          <Input
+            placeholder="Search members..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+        <div className="w-[200px]">
+          <Select
+            value={selectedCollector}
+            onValueChange={setSelectedCollector}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Filter by collector" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Collectors</SelectItem>
+              {collectors.map((collector) => (
+                <SelectItem key={collector.id} value={collector.id}>
+                  {collector.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
       <div className="flex items-center space-x-2">
         <Checkbox 
           id="selectAll"
-          checked={selectedMembers.length === SAMPLE_MEMBERS.length}
+          checked={selectedMembers.length === filteredMembers.length && filteredMembers.length > 0}
           onCheckedChange={handleSelectAll}
         />
-        <Label htmlFor="selectAll">Select All Members</Label>
+        <Label htmlFor="selectAll">Select All Members ({filteredMembers.length})</Label>
       </div>
-      <ScrollArea className="h-[200px] rounded-md border p-4">
-        <div className="space-y-4">
-          {SAMPLE_MEMBERS.map((member) => (
-            <div key={member.id} className="flex items-center space-x-2">
-              <Checkbox
-                id={member.id}
-                checked={selectedMembers.includes(member.id)}
-                onCheckedChange={() => handleMemberToggle(member.id)}
-              />
-              <Label htmlFor={member.id}>
-                {member.full_name} ({member.collector})
-              </Label>
-            </div>
-          ))}
-        </div>
+
+      <ScrollArea className="h-[400px] rounded-md border p-4">
+        {isLoadingMembers ? (
+          <div className="flex items-center justify-center h-full">
+            <p className="text-muted-foreground">Loading members...</p>
+          </div>
+        ) : filteredMembers.length === 0 ? (
+          <div className="flex items-center justify-center h-full">
+            <p className="text-muted-foreground">No members found</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {filteredMembers.map((member) => (
+              <div key={member.id} className="flex items-center space-x-2">
+                <Checkbox
+                  id={member.id}
+                  checked={selectedMembers.includes(member.id)}
+                  onCheckedChange={() => handleMemberToggle(member.id)}
+                />
+                <Label htmlFor={member.id} className="flex-1">
+                  <div className="flex justify-between items-center">
+                    <span>{member.full_name}</span>
+                    <span className="text-sm text-muted-foreground">
+                      {member.member_number}
+                    </span>
+                  </div>
+                </Label>
+              </div>
+            ))}
+          </div>
+        )}
       </ScrollArea>
     </div>
   );

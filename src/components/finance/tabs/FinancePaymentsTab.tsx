@@ -35,7 +35,7 @@ export function FinancePaymentsTab() {
               Export
             </Button>
           </div>
-          <TransactionsTable />
+          <TransactionsTable type="payment" />
         </div>
       </CardContent>
     </Card>

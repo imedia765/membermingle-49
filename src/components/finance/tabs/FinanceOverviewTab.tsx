@@ -15,7 +15,7 @@ export function FinanceOverviewTab() {
         </div>
       </CardHeader>
       <CardContent>
-        <TransactionsTable />
+        <TransactionsTable type="all" />
       </CardContent>
     </Card>
   );

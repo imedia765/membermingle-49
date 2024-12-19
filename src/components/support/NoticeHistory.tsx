@@ -10,36 +10,53 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ChevronDown, Check, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-
-const SAMPLE_MEMBERS = [
-  { id: "1", name: "John Doe", group: "Anjum Riaz Group" },
-  { id: "2", name: "Jane Smith", group: "Zabbie Group" },
-  { id: "3", name: "Alice Johnson", group: "Anjum Riaz Group" },
-  { id: "4", name: "Bob Wilson", group: "Zabbie Group" },
-];
-
-const SAMPLE_NOTICES = [
-  {
-    id: "1",
-    message: "Monthly meeting scheduled for next week",
-    sentAt: "2024-03-20T10:00:00",
-    recipients: ["1", "2", "3", "4"],
-    readBy: ["1", "3"]
-  },
-  {
-    id: "2",
-    message: "New guidelines update",
-    sentAt: "2024-03-19T15:30:00",
-    recipients: ["1", "2"],
-    readBy: ["1"]
-  }
-];
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 
 export function NoticeHistory() {
+  const { data: members = [], isLoading: isLoadingMembers } = useQuery({
+    queryKey: ['members'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('members')
+        .select('id, full_name');
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: notices = [], isLoading: isLoadingNotices } = useQuery({
+    queryKey: ['notices'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('support_tickets')
+        .select(`
+          id,
+          subject,
+          description,
+          created_at,
+          member_id,
+          ticket_responses (
+            id,
+            created_at,
+            responder_id
+          )
+        `)
+        .eq('status', 'notice')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+  });
+
   const getMemberName = (memberId: string) => {
-    const member = SAMPLE_MEMBERS.find(m => m.id === memberId);
-    return member ? member.name : 'Unknown Member';
+    const member = members.find(m => m.id === memberId);
+    return member ? member.full_name : 'Unknown Member';
   };
+
+  if (isLoadingMembers || isLoadingNotices) {
+    return <div>Loading...</div>;
+  }
 
   return (
     <div className="space-y-4">
@@ -56,16 +73,16 @@ export function NoticeHistory() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {SAMPLE_NOTICES.map((notice) => (
+            {notices.map((notice) => (
               <TableRow key={notice.id}>
                 <TableCell>
-                  {format(new Date(notice.sentAt), "MMM d, yyyy HH:mm")}
+                  {format(new Date(notice.created_at), "MMM d, yyyy HH:mm")}
                 </TableCell>
-                <TableCell>{notice.message}</TableCell>
-                <TableCell>{notice.recipients.length} members</TableCell>
+                <TableCell>{notice.subject}</TableCell>
+                <TableCell>{notice.member_id ? "1" : "All"} members</TableCell>
                 <TableCell>
-                  <Badge variant={notice.readBy.length === notice.recipients.length ? "default" : "secondary"}>
-                    {notice.readBy.length}/{notice.recipients.length} read
+                  <Badge variant={notice.ticket_responses.length > 0 ? "default" : "secondary"}>
+                    {notice.ticket_responses.length > 0 ? "Read" : "Unread"}
                   </Badge>
                 </TableCell>
                 <TableCell>
@@ -76,16 +93,21 @@ export function NoticeHistory() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-[200px]">
-                      {notice.recipients.map((recipientId) => (
-                        <DropdownMenuItem key={recipientId} className="justify-between">
-                          <span>{getMemberName(recipientId)}</span>
-                          {notice.readBy.includes(recipientId) ? (
+                      {notice.member_id ? (
+                        <DropdownMenuItem className="justify-between">
+                          <span>{getMemberName(notice.member_id)}</span>
+                          {notice.ticket_responses.length > 0 ? (
                             <Check className="h-4 w-4 text-green-500" />
                           ) : (
                             <X className="h-4 w-4 text-red-500" />
                           )}
                         </DropdownMenuItem>
-                      ))}
+                      ) : (
+                        <DropdownMenuItem>Sent to all members</DropdownMenuItem>
+                      )}
+                      <DropdownMenuItem className="whitespace-pre-wrap">
+                        {notice.description}
+                      </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </TableCell>

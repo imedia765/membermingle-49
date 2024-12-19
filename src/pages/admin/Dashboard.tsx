@@ -5,26 +5,9 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { PostgrestQueryBuilder } from "@supabase/postgrest-js";
+import { Database } from "@/integrations/supabase/types";
 
-// Define a type for the 'registrations' table
-type RegistrationsTable = {
-  Row: {
-    id: string;
-    status: string;
-    created_at: string;
-  };
-};
-
-// Define a type for the 'members' table
-type MembersTable = {
-    Row: {
-        id: string;
-        membership_type: string;
-        created_at: string;
-    };
-};
-
+type Tables = Database['public']['Tables'];
 
 export default function Dashboard() {
   const [totalMembers, setTotalMembers] = useState(0);
@@ -54,83 +37,79 @@ export default function Dashboard() {
         setActiveCollectors(collectorsData.length);
 
         // Fetch pending registrations
-          const { data: registrationsData, error: registrationsError } = await (supabase
-              .from("registrations") as PostgrestQueryBuilder<any, RegistrationsTable>)
-              .select("*", { count: 'exact' })
-              .eq('status', 'pending');
-          if (registrationsError) throw registrationsError;
-          setPendingRegistrations(registrationsData.length);
+        const { data: registrationsData, error: registrationsError } = await supabase
+          .from('registrations')
+          .select("*")
+          .eq('status', 'pending');
+        if (registrationsError) throw registrationsError;
+        setPendingRegistrations(registrationsData.length);
 
+        // Fetch monthly revenue (This is a simplified example, you might need a more complex query or a database function)
+        const { data: paymentsData, error: paymentsError } = await supabase
+          .from('payments')
+          .select('amount')
+          .gte('created_at', new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString());
 
-          // Fetch monthly revenue (This is a simplified example, you might need a more complex query or a database function)
-          const { data: paymentsData, error: paymentsError } = await supabase
-              .from('payments')
-              .select('amount')
-              .gte('created_at', new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString());
+        if (paymentsError) throw paymentsError;
 
-          if (paymentsError) throw paymentsError;
+        const totalRevenue = paymentsData.reduce((sum, payment) => sum + payment.amount, 0);
+        setMonthlyRevenue(totalRevenue);
 
-          const totalRevenue = paymentsData.reduce((sum, payment) => sum + payment.amount, 0);
-          setMonthlyRevenue(totalRevenue);
+        // Fetch membership type distribution
+        const { data: membershipTypes, error: membershipTypesError } = await supabase
+          .from('members')
+          .select('membership_type') as {data: {membership_type: string}[], error: any};
 
+        if (membershipTypesError) throw membershipTypesError;
 
-          // Fetch membership type distribution
-          const { data: membershipTypes, error: membershipTypesError } = await supabase
-              .from('members')
-              .select('membership_type') as {data: MembersTable['Row'][], error: any};
+        const typeCounts = membershipTypes.reduce((acc, curr) => {
+          acc[curr.membership_type] = (acc[curr.membership_type] || 0) + 1;
+          return acc;
+        }, {});
 
-          if (membershipTypesError) throw membershipTypesError;
+        const formattedMembershipTypeData = Object.entries(typeCounts).map(([name, value]) => ({
+          name,
+          value: value as number,
+        }));
+        setMembershipTypeData(formattedMembershipTypeData);
 
-          const typeCounts = membershipTypes.reduce((acc, curr) => {
-              acc[curr.membership_type] = (acc[curr.membership_type] || 0) + 1;
-              return acc;
-          }, {});
+        // Fetch membership data for chart (This is a simplified example, you might need a more complex query or a database function)
+        const currentDate = new Date();
+        const currentYear = currentDate.getFullYear();
+        const currentMonth = currentDate.getMonth();
 
-          const formattedMembershipTypeData = Object.entries(typeCounts).map(([name, value]) => ({
-              name,
-              value: value as number,
-          }));
-          setMembershipTypeData(formattedMembershipTypeData);
+        const monthlyData = [];
+        for (let i = 0; i < 5; i++) {
+          const month = new Date(currentYear, currentMonth - i);
+          const monthName = month.toLocaleString('default', { month: 'short' });
+          const firstDayOfMonth = new Date(month.getFullYear(), month.getMonth(), 1).toISOString();
+          const lastDayOfMonth = new Date(month.getFullYear(), month.getMonth() + 1, 0).toISOString();
 
+          const { data: monthlyMembers, error: monthlyMembersError } = await supabase
+            .from('members')
+            .select('*', { count: 'exact' })
+            .gte('created_at', firstDayOfMonth)
+            .lt('created_at', lastDayOfMonth);
 
-          // Fetch membership data for chart (This is a simplified example, you might need a more complex query or a database function)
-          const currentDate = new Date();
-          const currentYear = currentDate.getFullYear();
-          const currentMonth = currentDate.getMonth();
+          if (monthlyMembersError) throw monthlyMembersError;
 
-          const monthlyData = [];
-          for (let i = 0; i < 5; i++) {
-              const month = new Date(currentYear, currentMonth - i);
-              const monthName = month.toLocaleString('default', { month: 'short' });
-              const firstDayOfMonth = new Date(month.getFullYear(), month.getMonth(), 1).toISOString();
-              const lastDayOfMonth = new Date(month.getFullYear(), month.getMonth() + 1, 0).toISOString();
+          const { data: monthlyPayments, error: monthlyPaymentsError } = await supabase
+            .from('payments')
+            .select('amount')
+            .gte('created_at', firstDayOfMonth)
+            .lt('created_at', lastDayOfMonth);
 
-              const { data: monthlyMembers, error: monthlyMembersError } = await supabase
-                  .from('members')
-                  .select('*', { count: 'exact' })
-                  .gte('created_at', firstDayOfMonth)
-                  .lt('created_at', lastDayOfMonth);
+          if (monthlyPaymentsError) throw monthlyPaymentsError;
 
-              if (monthlyMembersError) throw monthlyMembersError;
+          const monthlyRevenue = monthlyPayments.reduce((sum, payment) => sum + payment.amount, 0);
 
-              const { data: monthlyPayments, error: monthlyPaymentsError } = await supabase
-                  .from('payments')
-                  .select('amount')
-                  .gte('created_at', firstDayOfMonth)
-                  .lt('created_at', lastDayOfMonth);
-
-              if (monthlyPaymentsError) throw monthlyPaymentsError;
-
-              const monthlyRevenue = monthlyPayments.reduce((sum, payment) => sum + payment.amount, 0);
-
-              monthlyData.push({
-                  month: monthName,
-                  members: monthlyMembers.length,
-                  revenue: monthlyRevenue,
-              });
-          }
-          setMembershipData(monthlyData.reverse());
-
+          monthlyData.push({
+            month: monthName,
+            members: monthlyMembers.length,
+            revenue: monthlyRevenue,
+          });
+        }
+        setMembershipData(monthlyData.reverse());
 
       } catch (error) {
         console.error("Error fetching data:", error);
@@ -141,7 +120,6 @@ export default function Dashboard() {
   }, []);
 
   const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042'];
-
 
   return (
     <div className="space-y-6">

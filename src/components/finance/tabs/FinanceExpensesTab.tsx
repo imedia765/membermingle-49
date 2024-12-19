@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { TransactionsTable } from "../TransactionsTable";
 
 export function FinanceExpensesTab() {
   return (
@@ -18,9 +18,13 @@ export function FinanceExpensesTab() {
                 <SelectValue placeholder="Filter by category" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="utilities">Utilities</SelectItem>
-                <SelectItem value="maintenance">Maintenance</SelectItem>
-                <SelectItem value="supplies">Supplies</SelectItem>
+                <SelectItem value="funeral_service">Funeral Service</SelectItem>
+                <SelectItem value="cemetery_fees">Cemetery Fees</SelectItem>
+                <SelectItem value="transportation">Transportation</SelectItem>
+                <SelectItem value="memorial_supplies">Memorial Supplies</SelectItem>
+                <SelectItem value="administrative">Administrative</SelectItem>
+                <SelectItem value="bereavement_support">Bereavement Support</SelectItem>
+                <SelectItem value="maintenance">Facility Maintenance</SelectItem>
                 <SelectItem value="other">Other</SelectItem>
               </SelectContent>
             </Select>
@@ -29,20 +33,7 @@ export function FinanceExpensesTab() {
               Export
             </Button>
           </div>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Description</TableHead>
-                <TableHead>Category</TableHead>
-                <TableHead>Amount</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead>Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {/* Add expense rows here */}
-            </TableBody>
-          </Table>
+          <TransactionsTable type="expense" />
         </div>
       </CardContent>
     </Card>

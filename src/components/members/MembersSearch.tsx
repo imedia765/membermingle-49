@@ -1,23 +1,26 @@
-import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Loader2 } from "lucide-react";
 
 interface MembersSearchProps {
   searchTerm: string;
   setSearchTerm: (term: string) => void;
+  isLoading?: boolean;
 }
 
-export function MembersSearch({ searchTerm, setSearchTerm }: MembersSearchProps) {
+export function MembersSearch({ searchTerm, setSearchTerm, isLoading }: MembersSearchProps) {
   return (
-    <div className="flex items-center space-x-2">
-      <div className="relative flex-1">
-        <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-        <Input 
-          placeholder="Search members..." 
-          className="pl-8" 
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
-      </div>
+    <div className="relative">
+      <Input
+        placeholder="Search members by name or member number..."
+        value={searchTerm}
+        onChange={(e) => setSearchTerm(e.target.value)}
+        className="max-w-sm"
+      />
+      {isLoading && (
+        <div className="absolute right-2 top-1/2 -translate-y-1/2">
+          <Loader2 className="h-4 w-4 animate-spin" />
+        </div>
+      )}
     </div>
   );
 }
