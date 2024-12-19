@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { supabase } from "../integrations/supabase/client";
 import { useToast } from "./ui/use-toast";
 import { RoleBadge } from "./navigation/RoleBadge";
@@ -15,16 +15,31 @@ export function NavigationMenu() {
   const { toast } = useToast();
   const { userRole, setUserRole, createProfile, fetchUserRole } = useProfile();
 
+  const checkSession = useCallback(async () => {
+    try {
+      const { data: { session }, error } = await supabase.auth.getSession();
+      if (error) {
+        console.error("Session check error:", error);
+        return false;
+      }
+      return !!session;
+    } catch (error) {
+      console.error("Session check failed:", error);
+      return false;
+    }
+  }, []);
+
   useEffect(() => {
-    const checkSession = async () => {
-      try {
-        const { data: { session }, error } = await supabase.auth.getSession();
-        if (error) {
-          console.error("Session check error:", error);
-          return;
-        }
-        setIsLoggedIn(!!session);
-        
+    let isActive = true;
+
+    const initializeAuth = async () => {
+      const hasSession = await checkSession();
+      if (!isActive) return;
+      
+      setIsLoggedIn(hasSession);
+      
+      if (hasSession) {
+        const { data: { session } } = await supabase.auth.getSession();
         if (session) {
           const profileData = await fetchUserRole(session.user.id);
           
@@ -35,14 +50,14 @@ export function NavigationMenu() {
             }
           }
         }
-      } catch (error) {
-        console.error("Session check failed:", error);
       }
     };
 
-    checkSession();
+    initializeAuth();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!isActive) return;
+      
       console.log("Auth state changed:", event, !!session);
       
       if (event === "SIGNED_IN" && session) {
@@ -68,9 +83,10 @@ export function NavigationMenu() {
     });
 
     return () => {
+      isActive = false;
       subscription.unsubscribe();
     };
-  }, [toast, createProfile, fetchUserRole, setUserRole]);
+  }, [toast, createProfile, fetchUserRole, setUserRole, checkSession]);
 
   const handleLogout = async () => {
     try {
@@ -91,7 +107,6 @@ export function NavigationMenu() {
         description: error instanceof Error ? error.message : "An unexpected error occurred",
         variant: "destructive",
       });
-      throw error; // Re-throw to be handled by the UI components if needed
     }
   };
 

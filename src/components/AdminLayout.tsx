@@ -7,7 +7,7 @@ import {
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
 import { Button } from "./ui/button";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { supabase } from "../integrations/supabase/client";
 import { useToast } from "./ui/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
@@ -30,6 +30,25 @@ export function AdminLayout() {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const refreshIntervalRef = useRef<NodeJS.Timeout>();
+  const lastActivityRef = useRef(Date.now());
+
+  // Update last activity timestamp on any user interaction
+  useEffect(() => {
+    const updateLastActivity = () => {
+      lastActivityRef.current = Date.now();
+    };
+
+    window.addEventListener('mousemove', updateLastActivity);
+    window.addEventListener('keydown', updateLastActivity);
+    window.addEventListener('click', updateLastActivity);
+
+    return () => {
+      window.removeEventListener('mousemove', updateLastActivity);
+      window.removeEventListener('keydown', updateLastActivity);
+      window.removeEventListener('click', updateLastActivity);
+    };
+  }, []);
 
   const checkSession = useCallback(async () => {
     try {
@@ -56,7 +75,6 @@ export function AdminLayout() {
 
   useEffect(() => {
     let isActive = true;
-    let refreshInterval: NodeJS.Timeout;
 
     const initializeAuth = async () => {
       if (!isActive) return;
@@ -83,21 +101,33 @@ export function AdminLayout() {
       }
     });
 
-    // Set up controlled query refresh interval
-    if (isLoggedIn) {
-      refreshInterval = setInterval(() => {
-        queryClient.invalidateQueries({ 
-          predicate: (query) => !query.queryKey.includes('static')
-        });
+    // Set up controlled query refresh interval with inactivity check
+    const setupQueryRefresh = () => {
+      if (refreshIntervalRef.current) {
+        clearInterval(refreshIntervalRef.current);
+      }
+
+      refreshIntervalRef.current = setInterval(() => {
+        const inactiveTime = Date.now() - lastActivityRef.current;
+        // Only refresh if user has been active in the last 5 minutes
+        if (inactiveTime < 5 * 60 * 1000) {
+          queryClient.invalidateQueries({ 
+            predicate: (query) => !query.queryKey.includes('static')
+          });
+        }
       }, 30000);
+    };
+
+    if (isLoggedIn) {
+      setupQueryRefresh();
     }
 
     // Cleanup function
     return () => {
       isActive = false;
       subscription.unsubscribe();
-      if (refreshInterval) {
-        clearInterval(refreshInterval);
+      if (refreshIntervalRef.current) {
+        clearInterval(refreshIntervalRef.current);
       }
     };
   }, [navigate, queryClient, location.pathname, isLoggedIn, checkSession]);
