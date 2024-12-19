@@ -1,26 +1,21 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { InfoIcon } from "lucide-react";
 
-interface MemberIdLoginFormProps {
-  onSubmit: (e: React.FormEvent<HTMLFormElement>) => Promise<void>;
-  isLoading?: boolean;
+interface FirstTimeLoginFormProps {
+  onSubmit: (memberId: string, password: string) => Promise<void>;
+  isLoading: boolean;
 }
 
-export const MemberIdLoginForm = ({ onSubmit, isLoading }: MemberIdLoginFormProps) => {
-  const [memberId, setMemberId] = useState("");
-  const [password, setPassword] = useState("");
+export const FirstTimeLoginForm = ({ onSubmit, isLoading }: FirstTimeLoginFormProps) => {
+  const [memberId, setMemberId] = useState('');
+  const [password, setPassword] = useState('');
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const cleanMemberId = memberId.toUpperCase().trim();
-    console.log("Login attempt with:", {
-      memberId: cleanMemberId,
-      passwordLength: password.length
-    });
-    await onSubmit(e);
+    await onSubmit(memberId, password);
   };
 
   return (
@@ -28,8 +23,8 @@ export const MemberIdLoginForm = ({ onSubmit, isLoading }: MemberIdLoginFormProp
       <Alert className="bg-blue-50 border-blue-200">
         <InfoIcon className="h-4 w-4 text-blue-500" />
         <AlertDescription className="text-sm text-blue-700">
-          If you're a new member, use your Member ID (e.g. TM20001) as both your username and password.
-          You'll be prompted to update your email and password after logging in.
+          For your first login, use your Member ID (e.g. TM20001) as both your username and password.
+          You'll be redirected to complete your profile after logging in.
         </AlertDescription>
       </Alert>
 
@@ -40,7 +35,7 @@ export const MemberIdLoginForm = ({ onSubmit, isLoading }: MemberIdLoginFormProp
           type="text"
           placeholder="Member ID (e.g. TM20001)"
           value={memberId}
-          onChange={(e) => setMemberId(e.target.value.toUpperCase().trim())}
+          onChange={(e) => setMemberId(e.target.value.toUpperCase())}
           required
           disabled={isLoading}
           className="uppercase"
@@ -48,8 +43,8 @@ export const MemberIdLoginForm = ({ onSubmit, isLoading }: MemberIdLoginFormProp
       </div>
       <div className="space-y-2">
         <Input
-          id="memberPassword"
-          name="memberPassword"
+          id="password"
+          name="password"
           type="password"
           placeholder="Password (same as Member ID)"
           value={password}
@@ -59,7 +54,7 @@ export const MemberIdLoginForm = ({ onSubmit, isLoading }: MemberIdLoginFormProp
         />
       </div>
       <Button type="submit" className="w-full" disabled={isLoading}>
-        {isLoading ? "Logging in..." : "Login with Member ID"}
+        {isLoading ? "Logging in..." : "First Time Login"}
       </Button>
     </form>
   );

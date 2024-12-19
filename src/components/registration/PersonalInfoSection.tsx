@@ -1,54 +1,13 @@
-import { useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
-import { UseFormRegister, UseFormSetValue, UseFormWatch } from "react-hook-form";
-import { countries } from "@/data/countries";
-import { useLocation } from "react-router-dom";
+import { UseFormRegister } from "react-hook-form";
 
 interface PersonalInfoProps {
   register: UseFormRegister<any>;
-  setValue: UseFormSetValue<any>;
-  watch: UseFormWatch<any>;
 }
 
-interface LocationState {
-  memberId?: string;
-  prefilledData?: {
-    fullName: string;
-    address: string;
-    town: string;
-    postCode: string;
-    mobile: string;
-    dob: string;
-    gender: string;
-    maritalStatus: string;
-    email: string;
-  };
-}
-
-export const PersonalInfoSection = ({ register, setValue, watch }: PersonalInfoProps) => {
-  const location = useLocation();
-  const state = location.state as LocationState;
-  const gender = watch("gender");
-
-  useEffect(() => {
-    if (state?.prefilledData) {
-      const data = state.prefilledData;
-      setValue("fullName", data.fullName);
-      setValue("address", data.address || "");
-      setValue("town", data.town || "");
-      setValue("postCode", data.postCode || "");
-      setValue("mobile", data.mobile || "");
-      setValue("dob", data.dob || "");
-      setValue("gender", data.gender || "male");
-      setValue("maritalStatus", data.maritalStatus || "");
-      setValue("email", data.email || "");
-    }
-  }, [state, setValue]);
-
+export const PersonalInfoSection = ({ register }: PersonalInfoProps) => {
   return (
     <div className="space-y-4">
       <h3 className="text-lg font-semibold">Personal Information</h3>
@@ -127,22 +86,14 @@ export const PersonalInfoSection = ({ register, setValue, watch }: PersonalInfoP
         </div>
         <div className="space-y-2">
           <label htmlFor="pob">Place of Birth</label>
-          <Select onValueChange={(value) => setValue("pob", value)}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select Country of Birth" />
-            </SelectTrigger>
-            <SelectContent>
-              {countries.map((country) => (
-                <SelectItem key={country.value} value={country.value}>
-                  {country.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Input
+            id="pob"
+            {...register("pob", { required: true })}
+          />
         </div>
         <div className="space-y-2">
           <label htmlFor="maritalStatus">Marital Status</label>
-          <Select onValueChange={(value) => setValue("maritalStatus", value)}>
+          <Select onValueChange={(value) => register("maritalStatus").onChange({ target: { value } })}>
             <SelectTrigger>
               <SelectValue placeholder="Select Marital Status" />
             </SelectTrigger>
@@ -154,18 +105,17 @@ export const PersonalInfoSection = ({ register, setValue, watch }: PersonalInfoP
             </SelectContent>
           </Select>
         </div>
-        <div className="space-y-4">
-          <Label htmlFor="gender">Gender</Label>
-          <div className="flex items-center space-x-2">
-            <Switch
-              id="gender"
-              checked={gender === "male"}
-              onCheckedChange={(checked) => setValue("gender", checked ? "male" : "female")}
-            />
-            <Label htmlFor="gender" className="text-sm">
-              {gender === "male" ? "Male" : "Female"}
-            </Label>
-          </div>
+        <div className="space-y-2">
+          <label htmlFor="gender">Gender</label>
+          <Select onValueChange={(value) => register("gender").onChange({ target: { value } })}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select Gender" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="male">Male</SelectItem>
+              <SelectItem value="female">Female</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </div>
     </div>

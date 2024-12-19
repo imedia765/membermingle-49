@@ -217,6 +217,7 @@ export type Database = {
           default_password_hash: string | null
           email: string | null
           email_verified: boolean | null
+          first_time_login: boolean | null
           full_name: string
           gender: string | null
           id: string
@@ -226,7 +227,9 @@ export type Database = {
           password_changed: boolean | null
           phone: string | null
           postcode: string | null
+          profile_completed: boolean | null
           profile_updated: boolean | null
+          registration_completed: boolean | null
           status: string | null
           town: string | null
           updated_at: string
@@ -242,6 +245,7 @@ export type Database = {
           default_password_hash?: string | null
           email?: string | null
           email_verified?: boolean | null
+          first_time_login?: boolean | null
           full_name: string
           gender?: string | null
           id?: string
@@ -251,7 +255,9 @@ export type Database = {
           password_changed?: boolean | null
           phone?: string | null
           postcode?: string | null
+          profile_completed?: boolean | null
           profile_updated?: boolean | null
+          registration_completed?: boolean | null
           status?: string | null
           town?: string | null
           updated_at?: string
@@ -267,6 +273,7 @@ export type Database = {
           default_password_hash?: string | null
           email?: string | null
           email_verified?: boolean | null
+          first_time_login?: boolean | null
           full_name?: string
           gender?: string | null
           id?: string
@@ -276,7 +283,9 @@ export type Database = {
           password_changed?: boolean | null
           phone?: string | null
           postcode?: string | null
+          profile_completed?: boolean | null
           profile_updated?: boolean | null
+          registration_completed?: boolean | null
           status?: string | null
           town?: string | null
           updated_at?: string

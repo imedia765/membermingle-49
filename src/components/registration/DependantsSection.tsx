@@ -1,4 +1,4 @@
-import { useState, forwardRef, useImperativeHandle } from "react";
+import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -12,13 +12,9 @@ interface Dependant {
   category: string;
 }
 
-export const DependantsSection = forwardRef((props, ref) => {
+export const DependantsSection = () => {
   const [dependants, setDependants] = useState<Dependant[]>([]);
   const [isOpen, setIsOpen] = useState(false);
-
-  useImperativeHandle(ref, () => ({
-    getDependants: () => dependants
-  }));
 
   const addDependant = () => {
     setDependants([...dependants, { name: "", dateOfBirth: "", gender: "", category: "" }]);
@@ -115,6 +111,4 @@ export const DependantsSection = forwardRef((props, ref) => {
       </CollapsibleContent>
     </Collapsible>
   );
-});
-
-DependantsSection.displayName = "DependantsSection";
+};

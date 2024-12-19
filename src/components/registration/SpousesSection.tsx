@@ -1,4 +1,4 @@
-import { useState, forwardRef, useImperativeHandle } from "react";
+import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -9,13 +9,9 @@ interface Spouse {
   dateOfBirth: string;
 }
 
-export const SpousesSection = forwardRef((props, ref) => {
+export const SpousesSection = () => {
   const [spouses, setSpouses] = useState<Spouse[]>([]);
   const [isOpen, setIsOpen] = useState(false);
-
-  useImperativeHandle(ref, () => ({
-    getSpouses: () => spouses
-  }));
 
   const addSpouse = () => {
     setSpouses([...spouses, { name: "", dateOfBirth: "" }]);
@@ -98,6 +94,4 @@ export const SpousesSection = forwardRef((props, ref) => {
       </CollapsibleContent>
     </Collapsible>
   );
-});
-
-SpousesSection.displayName = "SpousesSection";
+};

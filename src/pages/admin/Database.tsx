@@ -9,8 +9,9 @@ import { ImportSection } from "@/components/database/ImportSection";
 import { BackupSection } from "@/components/database/BackupSection";
 import { DeleteDatabaseSection } from "@/components/database/DeleteDatabaseSection";
 import { UserManagementSection } from "@/components/database/UserManagementSection";
-import { TestFunctionsSection } from "@/components/database/TestFunctionsSection";
+import { CodebaseBackupSection } from "@/components/database/CodebaseBackupSection";
 import { getDatabaseStatus } from "@/utils/databaseBackup";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface DatabaseStatus {
   lastAction: {
@@ -27,19 +28,37 @@ export default function Database() {
   const navigate = useNavigate();
   const [status, setStatus] = useState<DatabaseStatus | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const { checkSession, logout } = useAuth();
 
   const fetchStatus = async () => {
     try {
       setIsLoading(true);
+      // Verify session before fetching data
+      const isValid = await checkSession();
+      if (!isValid) {
+        await logout();
+        navigate("/login");
+        return;
+      }
       const status = await getDatabaseStatus();
       setStatus(status);
     } catch (error) {
       console.error('Error fetching database status:', error);
-      toast({
-        title: "Error",
-        description: "Failed to fetch database status",
-        variant: "destructive",
-      });
+      if (error.status === 403) {
+        await logout();
+        navigate("/login");
+        toast({
+          title: "Session Expired",
+          description: "Please sign in again",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to fetch database status",
+          variant: "destructive",
+        });
+      }
     } finally {
       setIsLoading(false);
     }
@@ -47,30 +66,39 @@ export default function Database() {
 
   useEffect(() => {
     const checkAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        toast({
-          title: "Authentication required",
-          description: "Please login to access this page",
-          variant: "destructive",
-        });
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error || !session) {
+          throw new Error("No valid session");
+        }
+        
+        const isValid = await checkSession();
+        if (!isValid) {
+          throw new Error("Invalid session");
+        }
+      } catch (error) {
+        console.error("Auth check failed:", error);
+        await logout();
         navigate("/login");
+        return;
       }
     };
 
     checkAuth();
     fetchStatus();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === "SIGNED_OUT" || !session) {
         navigate("/login");
+      } else if (event === "TOKEN_REFRESHED") {
+        await fetchStatus();
       }
     });
 
     return () => {
       subscription.unsubscribe();
     };
-  }, [navigate, toast]);
+  }, [navigate, toast, checkSession, logout]);
 
   return (
     <div className="space-y-6">
@@ -81,6 +109,7 @@ export default function Database() {
       <div className="grid gap-4 md:grid-cols-2">
         <ImportSection />
         <BackupSection />
+        <CodebaseBackupSection />
         <Card className="md:col-span-2">
           <CardHeader>
             <CardTitle>Database Status</CardTitle>
@@ -118,9 +147,6 @@ export default function Database() {
         </Card>
         <div className="md:col-span-2">
           <UserManagementSection />
-        </div>
-        <div className="md:col-span-2">
-          <TestFunctionsSection />
         </div>
         <div className="md:col-span-2">
           <DeleteDatabaseSection onDelete={fetchStatus} />

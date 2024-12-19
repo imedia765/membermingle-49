@@ -1,72 +1,79 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { PageHeader } from "@/components/medical-examiner/PageHeader";
-import { ProcessSection } from "@/components/medical-examiner/ProcessSection";
-import { FeesTable } from "@/components/medical-examiner/FeesTable";
-import { BurialTimesTable } from "@/components/medical-examiner/BurialTimesTable";
-import { StandingRegulations } from "@/components/medical-examiner/StandingRegulations";
-
-const noExclusiveRightFees = [
-  { service: "Child in the Forget Me Not Garden", fee: "No charge" },
-  { service: "Stillborn child or child under 16 years (unpurchased grave)", fee: "No charge" },
-  { service: "Child from outside of East Staffordshire", fee: "£48.00" },
-  { service: "Person over 16 years", fee: "£792.00" },
-];
-
-const exclusiveRightFees = [
-  { service: "Purchase of Exclusive Right of Burial", fee: "£1,245.00" },
-  { service: "Purchase of Exclusive Right of Burial for cremated remains", fee: "£433.00" },
-  { service: "Additional cost for bricked grave", fee: "£219.00" },
-  { service: "Burial of cremated remains", fee: "£219.00" },
-  { service: "Admin charge for multiple interments", fee: "£54.00" },
-];
-
-const monumentFees = [
-  { service: "Standard gravestone (up to 1,350mm × 914mm × 460mm)", fee: "£378.00" },
-  { service: "Cremated remains memorial (up to 610mm × 610mm × 460mm)", fee: "£378.00" },
-  { service: "Vase (unless incorporated in memorial)", fee: "£94.00" },
-  { service: "Additional inscription", fee: "£122.00" },
-  { service: "Forget-Me-Not Memorial", fee: "£60.00" },
-  { service: "Full kerbset (kerbs & headstone)", fee: "£1,267.00" },
-];
+import { Button } from "@/components/ui/button";
+import { Link } from "react-router-dom";
+import { ChevronLeft } from "lucide-react";
 
 const MedicalExaminerProcess = () => {
   return (
     <div className="container max-w-4xl mx-auto px-4 py-8">
-      <PageHeader />
+      <div className="mb-8">
+        <Link to="/">
+          <Button variant="ghost" className="gap-2">
+            <ChevronLeft className="h-4 w-4" />
+            Back to Home
+          </Button>
+        </Link>
+      </div>
 
       <div className="space-y-8">
-        <ProcessSection />
+        <div>
+          <h1 className="text-3xl font-bold mb-4">Medical Examiner Process</h1>
+          <p className="text-muted-foreground mb-6">
+            This page provides detailed information about our Medical Examiner Death Certification process,
+            including the flow chart and supporting documentation.
+          </p>
+        </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-xl font-semibold text-primary">Cemetery Fees and Charges</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ScrollArea className="h-[600px]">
-              <div className="space-y-6">
-                <FeesTable 
-                  title="Graves without Exclusive Right of Burial" 
-                  data={noExclusiveRightFees} 
+        <div className="space-y-6">
+          <div className="rounded-lg border bg-card p-6">
+            <h2 className="text-xl font-semibold mb-4">Process Flow Chart</h2>
+            <div className="space-y-4">
+              <p className="text-muted-foreground">
+                View or download our comprehensive Medical Examiner Process Flow Chart:
+              </p>
+              <object
+                data="/Flowchart-ME-Process-NBC-Final-1.pdf"
+                type="application/pdf"
+                width="100%"
+                height="500px"
+                className="mb-4"
+              >
+                <p>
+                  Unable to display PDF file.{" "}
+                  <a
+                    href="/Flowchart-ME-Process-NBC-Final-1.pdf"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary hover:underline"
+                  >
+                    Download PDF
+                  </a>
+                </p>
+              </object>
+            </div>
+          </div>
+
+          <div className="rounded-lg border bg-card p-6">
+            <h2 className="text-xl font-semibold mb-4">Supporting Documentation</h2>
+            <div className="grid gap-6 md:grid-cols-2">
+              <div className="space-y-4">
+                <img
+                  src="/WhatsApp Image 2024-10-02 at 3.50.07 PM.jpeg"
+                  alt="Medical Examiner Process Documentation 1"
+                  className="rounded-lg w-full h-auto shadow-lg object-contain"
+                  loading="lazy"
                 />
-                
-                <FeesTable 
-                  title="Graves with Exclusive Right of Burial" 
-                  data={exclusiveRightFees} 
-                />
-                
-                <FeesTable 
-                  title="Monument and Memorial Permits" 
-                  data={monumentFees} 
-                />
-                
-                <BurialTimesTable />
-                
-                <StandingRegulations />
               </div>
-            </ScrollArea>
-          </CardContent>
-        </Card>
+              <div className="space-y-4">
+                <img
+                  src="/WhatsApp Image 2024-10-02 at 3.50.07 PM (1).jpeg"
+                  alt="Medical Examiner Process Documentation 2"
+                  className="rounded-lg w-full h-auto shadow-lg object-contain"
+                  loading="lazy"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

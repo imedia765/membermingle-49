@@ -1,5 +1,5 @@
-import { Link, Outlet, useNavigate, useLocation } from "react-router-dom";
-import { LayoutDashboard, Users, UserCheck, ClipboardList, Database, DollarSign, UserCircle, ChevronDown, HeadsetIcon, RefreshCw } from "lucide-react";
+import { Link, Outlet, useNavigate } from "react-router-dom";
+import { LayoutDashboard, Users, UserCheck, ClipboardList, Database, DollarSign, UserCircle, ChevronDown, HeadsetIcon } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -7,10 +7,10 @@ import {
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
 import { Button } from "./ui/button";
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "../integrations/supabase/client";
 import { useToast } from "./ui/use-toast";
-import { useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/contexts/AuthContext";
 
 const menuItems = [
   { icon: LayoutDashboard, label: "Dashboard", to: "/admin" },
@@ -25,125 +25,92 @@ const menuItems = [
 
 export function AdminLayout() {
   const navigate = useNavigate();
-  const location = useLocation();
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [loading, setLoading] = useState(true);
   const { toast } = useToast();
-  const queryClient = useQueryClient();
-  const refreshIntervalRef = useRef<NodeJS.Timeout>();
-  const lastActivityRef = useRef(Date.now());
+  const [loading, setLoading] = useState(true);
+  const { isLoggedIn, checkSession, logout } = useAuth();
 
-  // Update last activity timestamp on any user interaction
-  useEffect(() => {
-    const updateLastActivity = () => {
-      lastActivityRef.current = Date.now();
-    };
-
-    window.addEventListener('mousemove', updateLastActivity);
-    window.addEventListener('keydown', updateLastActivity);
-    window.addEventListener('click', updateLastActivity);
-
-    return () => {
-      window.removeEventListener('mousemove', updateLastActivity);
-      window.removeEventListener('keydown', updateLastActivity);
-      window.removeEventListener('click', updateLastActivity);
-    };
-  }, []);
-
-  const checkSession = useCallback(async () => {
-    try {
-      const { data: { session }, error } = await supabase.auth.getSession();
-      if (error) throw error;
-      
-      if (!session && location.pathname !== '/login') {
-        navigate("/login");
-        return false;
-      }
-      
-      return !!session;
-    } catch (error) {
-      console.error('Session check error:', error);
-      toast({
-        title: "Authentication Error",
-        description: "Please try logging in again",
-        variant: "destructive",
-      });
-      navigate("/login");
-      return false;
-    }
-  }, [navigate, toast, location.pathname]);
+  const handleSessionError = async () => {
+    setLoading(false);
+    await logout();
+    navigate("/login");
+    toast({
+      title: "Session Error",
+      description: "Please sign in again",
+      variant: "destructive",
+    });
+  };
 
   useEffect(() => {
-    let isActive = true;
+    let isMounted = true;
 
-    const initializeAuth = async () => {
-      if (!isActive) return;
-      
-      setLoading(true);
-      const hasSession = await checkSession();
-      if (isActive) {
-        setIsLoggedIn(hasSession);
-        setLoading(false);
+    const verifySession = async () => {
+      try {
+        console.log("Verifying admin session...");
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError) {
+          console.error("Session error:", sessionError);
+          throw sessionError;
+        }
+
+        if (!session) {
+          console.log("No session found, redirecting to login");
+          if (isMounted) {
+            await handleSessionError();
+          }
+          return;
+        }
+
+        // Verify the session is still valid
+        const isValid = await checkSession();
+        console.log("Session validation result:", isValid);
+        
+        if (!isValid && isMounted) {
+          console.log("Invalid session, logging out");
+          await handleSessionError();
+          return;
+        }
+
+        if (isMounted) {
+          setLoading(false);
+        }
+      } catch (error) {
+        console.error("Session verification failed:", error);
+        if (isMounted) {
+          await handleSessionError();
+        }
       }
     };
 
-    initializeAuth();
+    verifySession();
 
-    // Set up auth state change listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (!isActive) return;
+      if (!isMounted) return;
       
-      console.log("Auth state changed:", event);
-      setIsLoggedIn(!!session);
+      console.log("Auth state changed in admin layout:", event, !!session);
       
-      if (!session && location.pathname !== '/login') {
+      if (event === 'SIGNED_OUT' || !session) {
+        console.log('User signed out or session ended');
         navigate("/login");
+      } else if (event === 'TOKEN_REFRESHED') {
+        console.log('Token refreshed, verifying session');
+        await verifySession();
       }
     });
 
-    // Set up controlled query refresh interval with inactivity check
-    const setupQueryRefresh = () => {
-      if (refreshIntervalRef.current) {
-        clearInterval(refreshIntervalRef.current);
-      }
-
-      refreshIntervalRef.current = setInterval(() => {
-        const inactiveTime = Date.now() - lastActivityRef.current;
-        // Only refresh if user has been active in the last 5 minutes
-        if (inactiveTime < 5 * 60 * 1000) {
-          queryClient.invalidateQueries({ 
-            predicate: (query) => !query.queryKey.includes('static')
-          });
-        }
-      }, 30000);
-    };
-
-    if (isLoggedIn) {
-      setupQueryRefresh();
-    }
-
-    // Cleanup function
     return () => {
-      isActive = false;
+      console.log("Cleaning up admin layout auth subscription");
+      isMounted = false;
       subscription.unsubscribe();
-      if (refreshIntervalRef.current) {
-        clearInterval(refreshIntervalRef.current);
-      }
     };
-  }, [navigate, queryClient, location.pathname, isLoggedIn, checkSession]);
-
-  const handleNavigation = useCallback((path: string) => {
-    if (location.pathname !== path) {
-      queryClient.cancelQueries();
-      navigate(path);
-    }
-  }, [location.pathname, navigate, queryClient]);
+  }, [navigate, toast, checkSession, logout]);
 
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin">
-          <RefreshCw className="h-8 w-8 text-primary" />
+        <div className="text-center space-y-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary mx-auto"></div>
+          <p className="text-muted-foreground">Loading...</p>
         </div>
       </div>
     );
@@ -156,12 +123,12 @@ export function AdminLayout() {
   return (
     <div className="min-h-screen flex flex-col w-full bg-background">
       <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container">
+        <div className="container py-2">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
                 variant="default"
-                className="w-full justify-between h-12 hover:bg-primary/90 transition-colors my-2"
+                className="w-full justify-between h-12"
               >
                 <span className="font-semibold">Menu</span>
                 <ChevronDown className="h-4 w-4 opacity-50" />
@@ -171,7 +138,7 @@ export function AdminLayout() {
               {menuItems.map((item) => (
                 <DropdownMenuItem
                   key={item.to}
-                  onClick={() => handleNavigation(item.to)}
+                  onClick={() => navigate(item.to)}
                   className="flex items-center gap-3 cursor-pointer py-3 px-4 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-700 dark:hover:text-blue-300 text-base"
                 >
                   <item.icon className="h-5 w-5" />

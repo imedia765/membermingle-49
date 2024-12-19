@@ -49,21 +49,19 @@ export function CollectorCard({
                 <h3 className="text-xl text-white truncate">
                   {collector.prefix}{collector.number} - {collector.name}
                 </h3>
+                <span className={`text-sm ${statusColor}`}>({statusText})</span>
               </div>
               <p className="text-sm text-gray-400">
                 Members: {memberCount}
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <span className={`text-sm ${statusColor}`}>({statusText})</span>
-            <CollectorActions 
-              collector={collector}
-              collectors={collectors}
-              onEdit={onEdit}
-              onUpdate={onUpdate}
-            />
-          </div>
+          <CollectorActions 
+            collector={collector}
+            collectors={collectors}
+            onEdit={onEdit}
+            onUpdate={onUpdate}
+          />
         </div>
       </CardHeader>
       {isExpanded && collector.members && collector.members.length > 0 && (

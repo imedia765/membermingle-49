@@ -94,24 +94,10 @@ export function MoveCollectorMembersDialog({
     }
 
     setIsLoading(true);
-
-    // Get the new collector's name
-    const newCollector = collectors.find(c => c.id === selectedCollectorId);
-    if (!newCollector) {
-      toast({
-        title: "Error",
-        description: "Selected collector not found",
-        variant: "destructive",
-      });
-      setIsLoading(false);
-      return;
-    }
-
     const { error } = await supabase
       .from('members')
       .update({ 
         collector_id: selectedCollectorId,
-        collector: newCollector.name, // Add this line to update the collector name
         updated_at: new Date().toISOString()
       })
       .in('id', selectedMembers);
@@ -126,7 +112,7 @@ export function MoveCollectorMembersDialog({
     } else {
       toast({
         title: "Success",
-        description: `${selectedMembers.length} members have been moved to ${newCollector.name}.`,
+        description: `${selectedMembers.length} members have been moved to the selected collector.`,
       });
       onOpenChange(false);
       onUpdate();
