@@ -55,9 +55,20 @@ export function TestFunctionsSection() {
       description: "Tests error reporting to Sentry",
       test: async () => {
         try {
-          throw new Error("Test error for Sentry");
+          // Create a test error with a custom message and additional context
+          const error = new Error("Test error for Sentry");
+          Sentry.withScope((scope) => {
+            scope.setExtra("testType", "manual_error_test");
+            scope.setTag("environment", "development");
+            scope.setLevel("error");
+            Sentry.captureException(error);
+          });
+          throw error;
         } catch (error) {
-          Sentry.captureException(error);
+          if (error instanceof Error) {
+            // Re-throw the error after capturing it
+            throw new Error(`Sentry test error: ${error.message}`);
+          }
           throw error;
         }
       }

@@ -8,10 +8,22 @@ export const initSentry = () => {
         Sentry.browserTracingIntegration(),
         Sentry.replayIntegration(),
       ],
+      // Enable tracing
       tracesSampleRate: 1.0,
       tracePropagationTargets: ["localhost", /^https:\/\/yourserver\.io\/api/],
+      // Session Replay
       replaysSessionSampleRate: 0.1,
       replaysOnErrorSampleRate: 1.0,
+      // Additional configuration
+      beforeSend(event) {
+        // Add additional context to all events
+        event.tags = {
+          ...event.tags,
+          environment: import.meta.env.MODE
+        };
+        return event;
+      },
+      debug: import.meta.env.DEV, // Enable debug in development
     });
   }
 };
