@@ -54,8 +54,10 @@ export function TestFunctionsSection() {
       name: "error_test",
       description: "Tests error reporting to Sentry",
       test: async () => {
+        console.log('Starting Sentry test...');
+        
         // Create a test error with custom context
-        const testError = new Error("Intentional test error for Sentry");
+        const testError = new Error("Test Sentry Integration");
         
         // Add custom context and send to Sentry
         Sentry.withScope((scope) => {
@@ -63,13 +65,19 @@ export function TestFunctionsSection() {
           scope.setLevel("error");
           scope.setContext("test_details", {
             purpose: "Verify Sentry integration",
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
+            environment: import.meta.env.MODE
           });
+          
+          console.log('Sending test error to Sentry...');
           Sentry.captureException(testError);
         });
         
-        // Return success message - we don't throw here since we want to verify the error was sent
-        return "Error successfully sent to Sentry";
+        // Wait a bit to ensure the error is sent
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        console.log('Sentry test completed');
+        return "Error successfully sent to Sentry. Check your Sentry dashboard.";
       }
     }
   ];

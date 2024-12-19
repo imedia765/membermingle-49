@@ -8,22 +8,33 @@ export const initSentry = () => {
         Sentry.browserTracingIntegration(),
         Sentry.replayIntegration(),
       ],
-      // Enable tracing
-      tracesSampleRate: 1.0,
+      // Performance Monitoring
+      tracesSampleRate: 1.0, // Capture 100% of transactions in development
       tracePropagationTargets: ["localhost", /^https:\/\/yourserver\.io\/api/],
+      
       // Session Replay
-      replaysSessionSampleRate: 0.1,
-      replaysOnErrorSampleRate: 1.0,
-      // Additional configuration
+      replaysSessionSampleRate: 1.0, // Record 100% of sessions in development
+      replaysOnErrorSampleRate: 1.0, // Record 100% of sessions with errors
+      
+      // Additional Configuration
+      debug: true, // Enable debug mode to see what Sentry is doing
+      environment: import.meta.env.MODE,
+      
       beforeSend(event) {
         // Add additional context to all events
         event.tags = {
           ...event.tags,
-          environment: import.meta.env.MODE
+          environment: import.meta.env.MODE,
+          version: import.meta.env.VITE_APP_VERSION || 'development'
         };
+        console.log('Sending event to Sentry:', event);
         return event;
       },
-      debug: import.meta.env.DEV, // Enable debug in development
     });
+
+    // Log successful initialization
+    console.log('Sentry initialized successfully');
+  } else {
+    console.log('Sentry initialization skipped in development mode');
   }
 };
